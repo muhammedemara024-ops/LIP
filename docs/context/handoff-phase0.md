@@ -8,17 +8,24 @@ written or changed in this session.
 
 | Commit | Summary |
 | --- | --- |
-| `3ad38e4` | PD-002 approved (adopt LIP, pin upstream `8ad93c81a414f5f7521061ddd88009083f4857aa`); golden rule 1 rewritten; `07-fork-patches.md` created |
-| `0a27a01` | PD-003 approved (staff confirmation is the only path that grants purchase value) |
-| `eacef95` | PD-005 amendment A1 (manual billing at launch, Kashier deferred); task 0.11 created |
-| `bffac88` | PD-005 A1 follow-ups (grace / read-only / suspended stages, append-only payments) |
-| `dd71a37` | PD-003 amendment A1 (device-bound member QR code, offline display) |
-| `66dabd6` | PD-004 round 1 recorded; real-number test moved from 0.3 to 2.4 |
-| `ab4d3ae` | PD-004 approved (own OTP in the BFF, WhatsApp first + Egyptian SMS) |
-| `ab2b4de` | PD-006 round 1 recorded (topology, Frankfurt, design hedge, 0.10 as pilot gate) |
-| `fcdd4d5` | PD-006 approved (Render Frankfurt, Pro workspace, Render Postgres) |
-| `efc01d2` | PD-007 approved (Arabic-first, English second) |
-| `6f2199c` | PD-008 / task 0.6 approved (purchase capture: bill amount only) |
+| `f1e99b4` | PD-002 approved (adopt LIP, pin upstream `8ad93c81a414f5f7521061ddd88009083f4857aa`); golden rule 1 rewritten; `07-fork-patches.md` created |
+| `c22ad99` | PD-003 approved (staff confirmation is the only path that grants purchase value) |
+| `aea59e4` | PD-005 amendment A1 (manual billing at launch, Kashier deferred); task 0.11 created |
+| `c8dac15` | PD-005 A1 follow-ups (grace / read-only / suspended stages, append-only payments) |
+| `3807077` | PD-003 amendment A1 (device-bound member QR code, offline display) |
+| `5e80cca` | PD-004 round 1 recorded; real-number test moved from 0.3 to 2.4 |
+| `16eecef` | PD-004 approved (own OTP in the BFF, WhatsApp first + Egyptian SMS) |
+| `299c084` | PD-006 round 1 recorded (topology, Frankfurt, design hedge, 0.10 as pilot gate) |
+| `f47e3bc` | PD-006 approved (Render Frankfurt, Pro workspace, Render Postgres) |
+| `84d4578` | PD-007 approved (Arabic-first, English second) |
+| `8b58269` | PD-008 / task 0.6 approved (purchase capture: bill amount only) |
+| `6727a7f` | This handoff note |
+| `fa36922` | PD-009 approved (Google Wallet loyalty passes, P1 task 6.8; not part of Phase 0) |
+
+Hashes above are after rebasing onto `origin/main` (2026-11-06): the GitHub
+repo had the same two starting commits under different hashes, on top of
+`91c7ed3` ("bootstrap empty repository for safe publish"). Content was
+unchanged by the rebase.
 
 Also done outside commits: git remote `upstream` →
 `craveup-oss/loyalty-interchange-protocol` (tags tracked, push disabled).
