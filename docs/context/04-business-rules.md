@@ -45,8 +45,21 @@ reimplement them, call LIP. Rules marked (OURS) must be built in our layer.
 - MUST: corrections are new ledger entries; no UPDATE/DELETE on ledger. (LIP)
 - MUST: manual adjustments carry classification (`bonus|gift|migration|service_recovery|correction`),
   reason, actor, and an explicit tier-qualification flag. (LIP)
-- (OURS) A "bill amount only" purchase becomes one synthetic order line marked
-  loyalty-eligible; the BFF owns `order_id` generation per scan session.
+- (OURS, PD-008) A "bill amount only" purchase becomes one synthetic order line
+  marked loyalty-eligible; the BFF owns `order_id` generation per scan session.
+  Product/category/tag exclusions do not apply; stamps are per paid order.
+- MUST (PD-008): the cashier types the amount actually paid for eligible items
+  (after discounts, excluding free reward items); the input label is a café
+  setting: "Amount paid" (default) or "Subtotal before service & VAT".
+- MUST (PD-008): the earn preview comes from LIP `orders/evaluate`, never from
+  client-side math.
+- MUST (PD-008): above the café's large-bill threshold (default 2,000 EGP) the
+  amount is typed twice; above 5 × the threshold it is rejected (owner-only
+  adjustment).
+- MUST (PD-008): a cashier may void only their own purchase within 10 minutes
+  (full clawback via `orders/adjust`); a reward issued by that purchase is
+  cancelled in the same void operation if unredeemed; if already redeemed, the
+  void is blocked and only the owner resolves it.
 
 ## QR flows (OURS, PD-003)
 

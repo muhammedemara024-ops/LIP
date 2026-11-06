@@ -541,6 +541,68 @@ Consequences:
 
 Date / approved by: 2026-11-06, project owner.
 
+## PD-008 — Purchase capture: bill amount only (roadmap task 0.6) — Approved (2026-11-06)
+
+Context: small cafés have no POS integration (G-04). Facts from code
+(2026-11-06): LIP earning exclusions are item-based (`excluded_product_ids`,
+`excluded_category_ids`, `excluded_tags`, `excluded_line_kinds`); stamps are
+per order (`visit_stamp_policy.amount_per_order`), with no per-item stamp rule
+even when items are sent; `free_item` reward effects name products/categories
+and a `max_value`.
+
+Decision: in the MVP the cashier records a purchase as a **bill amount only**.
+The BFF turns it into one synthetic, loyalty-eligible order line with an
+`order_id` generated per scan session.
+
+Consequences:
+
+*Program design*
+- Product/category/tag exclusions do nothing with one synthetic line; the
+  program wizard hides them. Only minimum eligible spend and channel rules apply.
+- Stamps are "1 per paid order" (amount per order), not per item.
+- First backlog item after the MVP: bill amount + an optional short product list
+  picked by the cashier (enables exclusions; per-item stamps would still need a
+  fork patch because LIP stamps are per order).
+
+*What the cashier types*
+- An owner setting labels the input. Default **"Amount paid"** (many small cafés
+  print no itemized receipt). Cafés that print subtotal/service/VAT can switch
+  to **"Subtotal before service & VAT"**. We never compute taxes or service.
+- The amount is what the customer actually paid for eligible items, after
+  discounts and excluding any free reward item received at the same visit.
+- The confirm screen shows the amount and the points/stamps it will earn; the
+  preview comes from LIP `orders/evaluate`, never from client-side math.
+
+*Typing mistakes* (proposed defaults)
+- Each café sets a "large bill" threshold (default 2,000 EGP). Above it the
+  cashier must type the amount a second time. Above 5 × the threshold the amount
+  is rejected; only the owner can award it, as a classified adjustment.
+
+*Fixing a wrong amount*
+- The same staff member can void their own purchase within 10 minutes: a full
+  clawback on the same `order_id` through `orders/adjust` (audited), then
+  re-record. A void never grants value (consistent with PD-003).
+- If the voided purchase crossed a stamp threshold and LIP issued a reward for
+  it, the void also cancels that reward through `issued-rewards/cancel` when it
+  is still unredeemed. These are two LIP calls, not one database transaction:
+  the BFF runs them as one void operation with idempotency keys derived from the
+  void id, cancel first, so a retry completes both and never double-applies.
+- If that reward was already redeemed, the cashier's void is blocked; only the
+  owner can resolve it (task 3.6).
+- After 10 minutes, or for another staff member's purchase, only the owner can
+  correct it (task 3.6).
+- Task 3.6 must check and record how LIP's stamp reset / balancing adjustment
+  behaves when an order that crossed the threshold is adjusted.
+
+*Redeeming free-item rewards*
+- The cashier hands over the item; the reward runs reserve → capture
+  (PD-003). Its `product_ids` / `category_ids` are descriptive only in the MVP.
+- Task 3.4 must check whether LIP allows reserve/capture against a synthetic
+  order with no item lines, or without an order. If not, raise a new decision;
+  do not patch around it.
+
+Date / approved by: 2026-11-06, project owner.
+
 ---
 
 Template for new entries:

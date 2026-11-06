@@ -41,6 +41,9 @@
 | دليل العملاء | Customer directory | platform-level store of customers and their memberships; the only place personal data lives (G-01, PD-006) |
 | لغة المحتوى الأساسية | Main content language | the language a café must fill in for its program, rewards and branches (Arabic by default; PD-007) |
 | نص العرض | Display text | the localized name/description customers see; distinct from LIP's internal `name` label |
+| مبلغ الفاتورة | Bill amount | the single amount a cashier types for a purchase; becomes one synthetic order line (PD-008) |
+| حد الفاتورة الكبيرة | Large-bill threshold | café setting above which the cashier must re-type the amount (PD-008) |
+| إلغاء العملية | Void | a cashier's full clawback of their own purchase within 10 minutes (PD-008) |
 | واجهة | Surface | one audience's part of the web app: customer (`app.`), staff (`staff.`), owner (`dashboard.`) |
 | جلسة العميل | Customer session | the signed-in state the BFF keeps for a customer (90 days, sliding); never seen by LIP |
 | رسالة معاملات | Transactional message | a message about the customer's own card (reward earned, reward expiring); needs no marketing consent |

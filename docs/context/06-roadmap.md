@@ -39,7 +39,7 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
 | 0.3 | Decide PD-004: customer OTP provider + channel (SMS/WhatsApp) | G-06 | — | Provider and channel chosen. (JWKS condition dropped: PD-004 runs OTP in our BFF, so there is no outside token to verify. Real-number delivery test moved to 2.4.) | 2026-11-06 — Approved, conditional on the 2.4 real-number test |
 | 0.4 | Decide PD-006: hosting (LIP, BFF and one Next.js app on a container host in Frankfurt; Postgres provider) | — | 0.1 | Approved; region chosen; per-service monthly cost table ≤ $100 for staging + production | 2026-11-06 — Approved (Render Frankfurt, Pro workspace, Render Postgres), conditional |
 | 0.5 | Decide PD-007: Arabic-first, English second | G-14 | — | Approved | 2026-11-06 — Approved |
-| 0.6 | New decision: purchase capture = bill amount only vs items | G-04 | 0.2 | Decision recorded with its effect on product exclusions | |
+| 0.6 | New decision: purchase capture = bill amount only vs items | G-04 | 0.2 | Decision recorded with its effect on product exclusions | 2026-11-06 — Approved as PD-008 (bill amount only) |
 | 0.7 | Baseline: `npm ci && npm run typecheck && npm test` on Node 22 | — | — | All green, result + Node version recorded here | |
 | 0.8 | Baseline: run Postgres profile + `lip doctor` + `lip test` | — | 0.7 | Conformance passes against Postgres runtime; idle memory of the LIP process recorded (sizes the instance, PD-006) | |
 | 0.9 | Fix upstream AI-doc drift (`skills/lip/*`, old gap doc) or mark them non-authoritative; resolve `docs/postgres.md` "attached environment-specific disks" vs diskless `render.yaml` + release runbook | — | — | Skills and docs no longer contradict code | |
@@ -85,12 +85,12 @@ application code is written.
 | ID | Task | Closes | Depends on | Acceptance criteria | Done |
 | --- | --- | --- | --- | --- | --- |
 | 3.1 | Rotating member QR code, device-bound (server-verifiable, single-use, ≤60 s, bound to customer+device+business; PD-003 A1) | G-02 | 2.3 | Replay fails; expired fails; other café's code fails; revoked device fails; a 4th device is refused; code works offline on an installed PWA opened online before | |
-| 3.2 | Bill-amount order builder → valid `FoodserviceOrder` with stable `order_id` | G-04 | 0.6 | Double-submit awards once; totals reconcile; EGP piasters | |
+| 3.2 | Bill-amount order builder → valid `FoodserviceOrder` with stable `order_id` | G-04 | 0.6 | Double-submit awards once; totals reconcile; EGP piasters; input label per café setting ("Amount paid" default); preview from `orders/evaluate`; large-bill re-type and 5× rejection (PD-008) | |
 | 3.3 | Staff scan flow: scan → amount → evaluate → accrue | G-02 G-04 | 3.1, 3.2, 2.6 | Stamp/points visible to customer within 2 s; staff cannot award to own customer account; offline shows clear error and awards nothing | |
-| 3.4 | Redemption at counter: reserve → capture, cancel → reverse | — | 3.3 | A reward can never be used twice, including two cashiers at once; customer app cannot reserve or capture | |
+| 3.4 | Redemption at counter: reserve → capture, cancel → reverse | — | 3.3 | A reward can never be used twice, including two cashiers at once; customer app cannot reserve or capture; verify reserve/capture works with a synthetic order without item lines (or without an order) — if not, raise a new decision (PD-008) | |
 | 3.5 | Branch QR + pending claim queue + cashier confirm | G-03 | 3.3 | Claim never grants value until confirmed; cashier must type the claim code (unique among open claims at the branch); wrong code rejected, 3 wrong codes cancel the claim; expires after 15 min; one open claim per customer/branch | |
-| 3.6 | Undo / correction flow (staff requests, owner approves → manual adjustment) | — | 3.3, 2.9 | Classified adjustment with reason; visible in audit | |
-| 3.7 | Program wizard: stamps and points programs without JSON | G-08 | 2.8 | Owner creates "5 drinks → 1 free" in < 3 min; publishes via draft/publish; asks for both languages, requires only the café's main language (PD-007) | |
+| 3.6 | Undo / correction flow (staff requests, owner approves → manual adjustment) | — | 3.3, 2.9 | Classified adjustment with reason; visible in audit; cashier self-void within 10 min (clawback + cancel unredeemed issued reward, idempotent); void blocked if that reward was redeemed; LIP stamp reset/balancing behavior on adjusting a threshold-crossing order checked and recorded (PD-008) | |
+| 3.7 | Program wizard: stamps and points programs without JSON | G-08 | 2.8 | Owner creates "5 drinks → 1 free" in < 3 min; publishes via draft/publish; hides product/category/tag exclusions (PD-008); asks for both languages, requires only the café's main language (PD-007) | |
 | 3.8 | Anti-fraud rules v1 (scan velocity, out-of-hours, staff→same customers) | — | 3.3 | Owner alert generated in test scenarios | |
 
 **DoD:** M3 — full earn/redeem loop on staging with real phones; abuse test cases pass.
@@ -154,9 +154,10 @@ and isolation-test it first in Phase 2.
 
 ## Backlog (not scheduled)
 
+- **First after MVP (PD-008):** bill amount + optional short product list picked by the cashier (enables exclusions; per-item stamps would still need a fork patch)
 - Offline queue for cashier device when internet drops
 - Counter lookup by phone number (with OTP to the customer) when the QR cannot be scanned (PD-003)
-- Item-level purchases / product exclusions (if 0.6 chose amount-only)
+- Item-level purchases / product exclusions: full line items (PD-008 chose bill amount only)
 - Referral program, gamification
 - Franchise funding settlement
 - Kashier online billing (PD-005, deferred by A1): `KashierBillingProvider`
