@@ -37,6 +37,8 @@
 | مسح الكاشير لـ QR العميل | Staff scan (Method B) | ours (G-02); the trusted path that grants purchase value directly |
 | مسح العميل لـ QR الفرع | Customer scan (Method A) | ours (G-03); creates a pending claim only |
 | QR العضوية المتغير | Member QR code | ours: short-lived, single-use code identifying one customer at one business, computed on a registered customer device (PD-003 A1) |
+| كود التحقق | One-time code (OTP) | 6-digit sign-in code sent by WhatsApp or SMS (PD-004) |
+| قاطع الإرسال | OTP circuit breaker | platform-wide daily cap on OTP sends and spend; pauses sending when reached |
 | جهاز العميل | Customer device | a phone/browser registered to a customer account (max 3); the customer can revoke it |
 | عملية معلّقة | Pending claim | ours: a customer's request for purchase credit, worth nothing until staff confirm it |
 | كود التأكيد | Claim code | short code on the customer's phone that the cashier types to confirm a pending claim |

@@ -36,7 +36,7 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
 | --- | --- | --- | --- | --- | --- |
 | 0.1 | Decide PD-002: adopt LIP as loyalty core (fork + pin upstream `8ad93c8`) | — | — | PD-002 Approved or Superseded in 01-decisions.md | 2026-11-06 — Approved, conditional on 0.7 + 0.8 |
 | 0.2 | Decide PD-003: staff scan is the only path that grants value | — | — | PD-003 Approved | 2026-11-06 — Approved |
-| 0.3 | Decide PD-004: customer OTP provider + channel (SMS/WhatsApp) | G-06 | 0.11 (real-number test only) | Provider chosen; confirmed it issues JWKS-verifiable JWTs; Egyptian delivery tested with one real number | |
+| 0.3 | Decide PD-004: customer OTP provider + channel (SMS/WhatsApp) | G-06 | — | Provider and channel chosen; token verifiable by `packages/identity` (RS256/ES256 + JWKS) without a fork patch. (Real-number delivery test moved to 2.4.) | |
 | 0.4 | Decide PD-006: hosting (Next.js on Vercel, LIP runtime on container host, Postgres provider) | — | 0.1 | Approved; region chosen; monthly cost estimate written | |
 | 0.5 | Decide PD-007: Arabic-first, English second | G-14 | — | Approved | |
 | 0.6 | New decision: purchase capture = bill amount only vs items | G-04 | 0.2 | Decision recorded with its effect on product exclusions | |
@@ -57,7 +57,7 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
 | 1.3 | Cashier journey (PIN login → scan → amount → confirm → redeem → undo) | G-02 G-04 G-05 | 1.1 | Each step ≤ 2 taps; works on a cheap Android phone | |
 | 1.4 | Owner onboarding (sign up → branch → program wizard → print QR) under 15 min | G-08 | 1.1 | Timed walkthrough on prototype | |
 | 1.5 | Arabic RTL design system + Figma/prototype of all P0 screens | G-14 | 1.2–1.4 | Owner approves prototype | |
-| 1.6 | Plans & limits draft (Starter/Growth/Premium: customers, branches, messages, price in EGP) | G-12 | 1.1 | Numbers approved | |
+| 1.6 | Plans & limits draft (Starter/Growth/Premium: customers, branches, messages, price in EGP) | G-12 | 1.1 | Numbers approved; WhatsApp authentication rate verified against Meta's official rate card (PD-004) | |
 
 **DoD:** PRD v1.0 approved; prototype approved; no open question blocks Phase 2.
 
@@ -71,7 +71,7 @@ application code is written.
 | 2.1 | Rebrand: remove Crave/CraveUp names, ids (`crv_cus_*`), keep LICENSE/NOTICE | — | M1 | Grep finds no upstream brand in shipped code/UI | |
 | 2.2 | CI on GitHub Actions + staging environment (Postgres, LIP runtime, secrets manager) | — | 0.4 | Push to main deploys staging; tests required to merge | |
 | 2.3 | Platform customer directory above tenants (customers, memberships → member_id) | G-01 | 2.2 | One phone = one customer across cafés; café A cannot read café B's membership (RLS test) | |
-| 2.4 | Customer OTP auth integrated with BFF + OIDC verifier | G-06 | 0.3, 2.3 | Sign-in works end-to-end; tokens never reach LIP; rate limit on OTP requests | |
+| 2.4 | Customer OTP auth integrated with BFF + OIDC verifier | G-06 | 0.3, 2.3, 0.11 | Sign-in works end-to-end; tokens never reach LIP; per-phone/IP/device limits, bot check and global circuit breaker enforced; phone change revokes all sessions; Egyptian delivery tested with one real number over WhatsApp and SMS (moved from 0.3) | |
 | 2.5 | Cashier role: protocol write limited to accrue/redeem at own location; minimal customer view | G-05 | 2.2 | Permission tests: cashier cannot export, edit program, post manual adjustments, or act in other branch; staff phone OTP-verified at creation, change needs owner approval | |
 | 2.6 | Staff PIN login per branch device + device registration | G-05 | 2.5 | Lost device can be revoked by owner | |
 | 2.7 | Move platform state (profiles, events, segments, campaigns) from JSON blob to RLS tables; make the platform layer multi-instance-safe | G-11 | 2.2 | Platform state lives in revisioned rows; no 100k event truncation; every scheduler (campaign, engagement, membership) and the webhook dispatcher run under `withLease()`; a test starts two instances and proves a due campaign runs exactly once; load test with 500 tenants × 10k customers | |

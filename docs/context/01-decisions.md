@@ -201,12 +201,49 @@ Consequences:
 
 Date / approved by: 2026-11-06, project owner.
 
-## PD-004 — Customer authentication: phone OTP — Proposed
+## PD-004 — Customer authentication: phone OTP — Proposed (round 1 agreed 2026-11-06; provider open)
 
-LIP does not authenticate customers. Candidates: Supabase Auth phone OTP (needs
-an SMS/WhatsApp provider that delivers to Egyptian numbers) or a dedicated
-OTP provider. Must expose a JWKS/OIDC-compatible token so LIP's OIDC verifier
-can be reused.
+Context: LIP does not authenticate customers (G-06). LIP's verifier
+(`packages/identity/src/oidc.ts`) accepts only RS256/ES256 JWTs whose keys come
+from an HTTPS JWKS endpoint.
+
+**Assumption:** the legal entity (task 0.11, not yet registered) will be
+Egyptian-registered. SMS sender-ID registration and Meta Business verification
+wait for it. PD-004 stays Proposed until the real-number delivery test (task 2.4).
+
+Agreed in round 1 (2026-11-06):
+1. *Token check:* the BFF verifies the provider's token with `packages/identity`
+   used as a library (no fork patch), maps it to the platform customer →
+   `member_id`, and calls LIP with the merchant key. The LIP server never sees
+   a customer token.
+2. *Phone is a credential, not the identity:* the platform customer id is
+   stable. Changing the number requires being signed in plus an OTP to the new
+   number, and revokes every existing session and device secret (PD-003 A1).
+   The reused-number risk is accepted for the MVP; a support procedure detaches
+   a number from an account after checks.
+3. *Abuse limits* (all proposed starting values): Egyptian mobile numbers only
+   (`+20 1x…`); 6-digit code valid 5 min; resend cooldown 60 s; per phone ≤ 5
+   sends/hour and ≤ 10/day; ≤ 5 wrong attempts per code; per-IP and per-device
+   limits; a bot check (e.g. Cloudflare Turnstile) before the first send; a
+   platform-wide **circuit breaker** — global daily caps on OTP sends and on OTP
+   spend; reaching either pauses sending and alerts the platform admin.
+4. *Session:* sliding 90-day httpOnly cookie set by the BFF; "sign out of all
+   devices"; a fresh OTP only for account deletion and phone change.
+5. *Offline member QR:* see PD-003 A1.
+6. *Cost:* OTP is a platform cost, not counted against a café's message
+   allowance; it feeds plan pricing (task 1.6).
+7. *Channel:* WhatsApp first (authentication template with a copy-code
+   button); SMS fallback after the 60 s cooldown or when the number is not on
+   WhatsApp, through an Egyptian SMS provider with a registered sender ID.
+   If Supabase Auth is used, WhatsApp goes through the Send SMS Hook to a sender
+   we choose (Supabase's built-in WhatsApp is Twilio-only).
+   - Price, **unverified**: WhatsApp authentication ≈ $0.0036/message per a
+     third-party copy of Meta's rate card; the domestic vs international
+     authentication rate depends on where the WhatsApp Business account is
+     registered. Verify against Meta's official rate card before task 1.6.
+   - Price, verified: Twilio SMS to Egypt $0.3959/segment (2026-11-06).
+
+Open for round 2: provider.
 
 ## PD-005 — Billing provider: Kashier — Approved (2026-11-06); amended 2026-11-06 (A1: manual billing at launch, Kashier deferred)
 
