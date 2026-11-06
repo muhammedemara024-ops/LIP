@@ -48,7 +48,9 @@
 | جلسة العميل | Customer session | the signed-in state the BFF keeps for a customer (90 days, sliding); never seen by LIP |
 | رسالة معاملات | Transactional message | a message about the customer's own card (reward earned, reward expiring); needs no marketing consent |
 | قاطع الإرسال | OTP circuit breaker | platform-wide daily cap on OTP sends and spend; pauses sending when reached |
-| جهاز العميل | Customer device | a phone/browser registered to a customer account (max 3); the customer can revoke it |
+| جهاز العميل | Customer device | a phone/browser or Google Wallet pass registered to a customer account (max 3); the customer can revoke it |
+| كارت المحفظة | Wallet pass | a Google Wallet loyalty pass for one membership; shows balance and a rotating code for earning only (PD-009) |
+| معرّف الكارت | Pass id | random id on a wallet pass; cannot be linked to the customer or `member_id` from outside |
 | عملية معلّقة | Pending claim | ours: a customer's request for purchase credit, worth nothing until staff confirm it |
 | كود التأكيد | Claim code | short code on the customer's phone that the cashier types to confirm a pending claim |
 | جلسة الموظف | Staff session | a signed-in staff member on a registered branch device; the only actor that grants purchase value |

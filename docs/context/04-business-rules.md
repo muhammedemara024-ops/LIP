@@ -87,6 +87,9 @@ Method B — staff scans customer QR (trusted path):
   them. The device secret is rotated every time the app is online.
 - Offline display requires the app to have been opened online at least once on
   that device (installed PWA with a service worker).
+- A Google Wallet pass counts as a customer device (PD-003 A1 addendum, PD-009):
+  rotating TOTP code, single-use, bound to {customer, pass, café}, earning only;
+  no static barcode is ever accepted.
 - Replay of a consumed token MUST fail with a clear error, not a silent success.
 
 Method A — customer scans branch QR (convenience path):
@@ -173,6 +176,13 @@ Method A — customer scans branch QR (convenience path):
 - Default send window: 10:00–21:00 Africa/Cairo.
 - MUST: never send an offer that is expired or already redeemed.
 - MUST: never send the same campaign to the same customer twice.
+- MUST (PD-009): a customer with an active Google Wallet pass gets transactional
+  notifications on the pass only (no WhatsApp fallback); others get WhatsApp.
+  At most 3 pass notifications per 24 h, priority reward expiring > reward
+  ready > stamp added; over budget, update silently. Pass messages never carry
+  marketing.
+- MUST (PD-009): pass data is only café brand, balance/stamps, reward status and
+  a random pass id unlinkable to customer id or `member_id`; no phone, no name.
 - Attribution: a return visit within the attribution window counts toward the
   campaign; use LIP holdout groups to measure lift.
 

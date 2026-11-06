@@ -116,7 +116,7 @@ and patterns, write our own engine":
 
 Date / approved by: 2026-11-06, project owner.
 
-## PD-003 — Staff confirmation is the only path that grants purchase value — Approved (2026-11-06); amended 2026-11-06 (A1: device-bound member QR)
+## PD-003 — Staff confirmation is the only path that grants purchase value — Approved (2026-11-06); amended 2026-11-06 (A1: device-bound member QR; A1 addendum: Wallet pass counts as a device)
 
 Context: the approved brief requires two capture methods: Method A (customer
 scans the branch QR) and Method B (staff scans the customer's rotating QR).
@@ -200,6 +200,13 @@ Consequences:
 - Changing the phone number (PD-004) revokes every session and device secret.
 
 Date / approved by: 2026-11-06, project owner.
+
+*A1 addendum — 2026-11-06 (PD-009):* "device" also includes a **Google Wallet
+pass**. The pass shows a rotating TOTP code (`rotatingBarcode`), counts toward
+the 3-device limit, can be revoked, has its key replaced via the API from time
+to time, and each code is single-use on the server and bound to
+{customer, pass, café}. A pass code is for earning only; redemption starts from
+the web app. No static barcode is ever accepted.
 
 ## PD-004 — Customer authentication: phone OTP run by our BFF — Approved (2026-11-06, conditional)
 
@@ -600,6 +607,99 @@ Consequences:
 - Task 3.4 must check whether LIP allows reserve/capture against a synthetic
   order with no item lines, or without an order. If not, raise a new decision;
   do not patch around it.
+
+Date / approved by: 2026-11-06, project owner.
+
+## PD-009 — Wallet loyalty passes (Google Wallet first) — Approved (2026-11-06, conditional)
+
+Context: hard constraint of zero added cost at launch (no paid accounts or
+subscriptions until the first paying cafés). Research on 2026-11-06 (official
+Google pages; unverified items marked): passes can be saved from a website via a
+signed "Save to Google Wallet" link (service account, no Android app);
+`LoyaltyObject.rotatingBarcode` supports TOTP-SHA1 codes; at most 3 push
+notifications per pass per 24 h (assume messages and field updates share it);
+field updates notify only for balance fields; users can disable pass
+notifications and there is no delivery receipt; `accountName` / `accountId`
+are optional; `LocalizedString.translatedValues` exist (Arabic RTL display
+unverified); Egypt is on Google Wallet's country list (real use unverified);
+no fee is stated anywhere, but "free" is not stated either (unverified); the
+publishing docs allow "a real business, organization, or individual". Apple
+Developer Program: $99/year (verified).
+
+Decision: each customer membership can be added as a **Google Wallet loyalty
+pass**. Apple Wallet is deferred. Priority **P1**, roadmap task **6.8**.
+
+**Conditions** (checked during issuer setup, before task 6.8 is done; PD-009
+reopens if any fails):
+1. Zero cost confirmed: no fee, and no billing account or card required.
+2. Publishing approval granted, with the platform as the single issuer; each
+   café's pass class uses its logo with the café's agreement, written into the
+   café onboarding terms.
+3. Real-device test on Android in Egypt: the pass saves; the staff surface scans
+   the rotating code; Arabic displays right-to-left; a notification arrives.
+4. Wallet save/delete callbacks (`callbackOptions`) exist and work (from memory,
+   not verified by the research).
+
+Consequences:
+
+*Issuance and data*
+1. The "Add to Google Wallet" button appears only after verified OTP sign-in
+   (PD-004). One pass per membership (per café, PD-001). Closing the membership
+   or deleting the account sets the pass expired/inactive via the API (part of
+   PD-001 rule 8). A phone change does not affect the pass (it belongs to the
+   stable customer id).
+2. The pass carries only café brand, balance/stamps, reward status and an opaque
+   pass id; no phone and no name (`accountName` is optional). The pass id is a
+   separate random id — not the customer id or LIP `member_id` — so pass data
+   cannot be linked to our records from outside. The 0.10 legal opinion must
+   also cover Google Wallet as a provider holding data abroad.
+3. Pass text follows PD-007: `defaultValue` in the café's main content language,
+   `translatedValues` for the other language.
+
+*Code on the pass*
+4. The pass shows a **rotating TOTP code** (`rotatingBarcode`) and is treated as
+   a customer device under PD-003 A1 (see PD-003 A1 addendum): it counts toward
+   the 3-device limit, can be revoked, its key is replaced via the API from time
+   to time, and each code is single-use on the server and bound to
+   {customer, pass, café}. The code contains the random pass id, never a
+   customer id. No static fallback barcode.
+5. If the real-device test (condition 3) fails for the rotating code, the pass
+   carries **no barcode** (balance + notifications only; the customer opens the
+   web app to show the code). A static QR is rejected: it would let a cashier
+   award a friend from a screenshot without the friend present, the case PD-003
+   removed.
+6. The pass code is for **earning only**. Redemption always starts from the
+   customer's "Redeem" button in the web app (reward QR, PD-003). The pass shows
+   reward status and a link to the web app.
+
+*Notifications and channel order*
+7. Stamp added / points earned → balance field update with `notifyPreference:
+   NOTIFY`. Reward ready / reward expiring → message with `TEXT_AND_NOTIFY`.
+8. Budget: 3 notifications per pass per 24 h. Priority: reward expiring >
+   reward ready > stamp added; over budget, update silently.
+9. Customers with an active pass (saved and not deleted, per the callbacks) get
+   the pass only — no WhatsApp fallback — accepting that delivery cannot be
+   confirmed. Customers without a pass get WhatsApp (task 6.5). WhatsApp
+   transactional cost therefore scales only with customers who have no pass
+   (all iPhone users until Apple Wallet, plus Android users who did not add it);
+   the saving cannot be quantified until the WhatsApp utility rate for Egypt is
+   verified.
+10. No marketing through the pass. Pass messages only concern that customer's
+    own card; marketing stays on WhatsApp with per-café consent.
+11. Review point: compare the rate of rewards that expire unredeemed for
+    pass-only customers vs WhatsApp customers. If pass-only customers lose
+    noticeably more rewards, reopen the "no WhatsApp fallback for reward
+    expiring" rule. (Passes ship in Phase 6, after the pilot, so the comparison
+    runs once task 6.8 has been live for 8 weeks — proposed.)
+
+*Dependencies and Apple*
+12. Task 6.8 depends on 6.4 and 3.1. It does **not** depend on 0.11, because the
+    docs allow an individual issuer — subject to confirmation during issuer
+    setup. If Google requires a business entity after all, add the 0.11
+    dependency then.
+13. Apple Wallet stays deferred ($99/year Apple Developer Program). Trigger:
+    first paying café **and** the owner approves the fee. Until then iPhone
+    users use the web-app card (offline per PD-003 A1).
 
 Date / approved by: 2026-11-06, project owner.
 

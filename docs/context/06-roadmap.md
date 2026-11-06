@@ -132,6 +132,7 @@ application code is written.
 | 6.5 | WhatsApp Business connector (+ SMS fallback), templates, opt-out | G-10 | 6.4 | Frequency cap + send window enforced; cost counted against plan | |
 | 6.6 | Campaign attribution with holdout + retention KPIs (repeat rate, frequency, cohorts) | G-13 | 6.4 | Lift report per campaign | |
 | 6.7 | Super-admin console: businesses, plans, suspensions, usage | — | 6.3 | Operator actions audited | |
+| 6.8 | Google Wallet loyalty passes (PD-009): save link after OTP sign-in, one pass per membership, rotating code as a customer device, pass notifications with WhatsApp only for customers without a pass | — | 6.4, 3.1 (+0.11 only if Google requires a business entity) | Four PD-009 checks pass: zero cost (no fee, no billing account/card); publishing approval (platform as single issuer, café logo consent in onboarding terms); real Android device in Egypt (saves, staff scans rotating code, Arabic RTL, notification arrives); save/delete callbacks work. Fallback to no barcode if the rotating-code test fails. Expired-reward comparison scheduled 8 weeks after go-live | |
 
 **DoD:** M6 — first café's offline payment recorded and its period extended in the super-admin console; automated win-back shows measurable lift vs holdout.
 
@@ -164,3 +165,6 @@ and isolation-test it first in Phase 2.
   (save token, HMAC-verified webhooks, card data never stored) + renewal
   scheduler (retries, idempotent per subscription/period). Former tasks 6.1/6.2.
   Revisit at 30 paying cafés or when manual collection becomes a bottleneck.
+- Apple Wallet passes (PD-009): deferred. Trigger = first paying café **and**
+  the owner approves the $99/year Apple Developer Program fee. Until then iPhone
+  users use the web-app card (offline per PD-003 A1).
