@@ -20,7 +20,8 @@
 ```
 
 Super-admin / plans / subscriptions / provisioning: LIP Cloud `/cloud/v1`
-(`apps/cloud`), with Kashier (PD-005) replacing Stripe.
+(`apps/cloud`). Billing at launch is manual (`billing_provider: "manual"`,
+PD-005 A1); Kashier is deferred; Stripe stays unused.
 
 ## Module → LIP mapping
 
@@ -46,7 +47,7 @@ Super-admin / plans / subscriptions / provisioning: LIP Cloud `/cloud/v1`
 | Campaigns | Scheduled reward campaigns, holdout %, attribution window, runs | `campaigns.ts` | Partial — reward issuance only, no trigger automation (G-09) |
 | Notifications | Signed webhook messaging connector, retries, consent filter | `engagement.ts` | Partial — no WhatsApp/SMS/push, no caps/quiet hours (G-10) |
 | Analytics | Liability, earned/redeemed/expired, campaign totals, location reports | `/platform/v1/analytics`, `/admin/api/v1/analytics` | Partial — no retention/cohort KPIs (G-13) |
-| Subscription billing | Plans Free/Pro/Business, quotas, usage metering, Stripe | `apps/cloud/src/billing.ts` | Replace Stripe with new `KashierBillingProvider` + our renewal scheduler (PD-005) |
+| Subscription billing | Plans Free/Pro/Business, quotas, usage metering, `billing_provider: "manual"` (default) or Stripe | `apps/cloud/src/billing.ts`, `service.ts`, `types.ts` | Partial — manual provider exists, but no way to set plan/period, no payment records, nothing acts on period end (PD-005 A1). Kashier deferred |
 | Audit logs | Tenant access audit, program audit, membership audit, location audit | various `*AuditEntry` | Good |
 | Idempotency / anti-double-award | Spec-level guarantee + business-id protection | `spec/core.md`, `docs/idempotency.md` | Excellent |
 | Tenant isolation | Postgres FORCE RLS via `lip.tenant_id` GUC, isolation tests | `storage-postgres/migrations/002`, `tests/unit/tenant-isolation-live.test.ts` | Excellent (engine tables) |

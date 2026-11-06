@@ -182,7 +182,7 @@ an SMS/WhatsApp provider that delivers to Egyptian numbers) or a dedicated
 OTP provider. Must expose a JWKS/OIDC-compatible token so LIP's OIDC verifier
 can be reused.
 
-## PD-005 — Billing provider: Kashier — Approved (2026-11-06)
+## PD-005 — Billing provider: Kashier — Approved (2026-11-06); amended 2026-11-06 (A1: manual billing at launch, Kashier deferred)
 
 Context: upstream LIP ships Stripe only; Stripe does not onboard
 Egyptian-resident businesses directly.
@@ -190,7 +190,7 @@ Egyptian-resident businesses directly.
 Decision: subscriptions from café owners are collected through **Kashier**
 (EGP; cards and wallets). Stripe stays unused/disabled.
 
-Consequences:
+Consequences (deferred by amendment A1 below — they apply when Kashier is revisited):
 - Kashier has **no managed subscriptions/billing-plans API**. We own the billing
   schedule: Save Token API once (customer completes first payment, webhook
   returns `cardDataToken` + `agreementId`), then charge each cycle with the
@@ -205,6 +205,50 @@ Consequences:
   separate keys and URLs.
 - Add `kashier` to the Cloud `billing_provider` union (currently `manual | stripe`).
 - Manual/invoice billing remains available for pilot cafés.
+
+### Amendment A1 — 2026-11-06: manual collection at launch; Kashier deferred
+
+Decision: for launch, subscriptions are collected manually. The platform owner
+contacts each café when its subscription is about to end and collects payment
+offline (cash, InstaPay, Vodafone Cash, bank transfer). Kashier is **deferred,
+not removed**. Revisit when we reach 30 paying cafés (proposed trigger) or when
+manual collection becomes a bottleneck. Stripe stays unused.
+
+Consequences:
+1. No online payment and no card tokens in the MVP. Former roadmap tasks 6.1
+   (`KashierBillingProvider`) and 6.2 (renewal scheduler) move to the backlog.
+2. Manual billing is a P0/P1 feature of the super-admin console:
+   - Record a payment: café, amount in EGP (integer piasters), method,
+     reference, date, recorded by.
+   - Set or extend the subscription period (plan + end date). Every change is
+     audited.
+   - A list of cafés whose subscription ends in the next 7 days, plus overdue ones.
+   - Payment history per café.
+3. The café owner sees the plan, end date and a renewal reminder in their
+   dashboard before expiry.
+4. Expiry behavior is unchanged (04-business-rules): grace period, then
+   read-only dashboard; customers keep their balances and can still redeem.
+5. Use LIP Cloud's existing `billing_provider: "manual"`; no new provider.
+   Verified in code on 2026-11-06 (tests not run):
+   - `"manual"` is already the default when an organization is created, with a
+     fixed 30-day period (`defaultSubscriptionPeriod`, `apps/cloud/src/service.ts`).
+   - **No API or service method sets the plan or period of a manual
+     subscription.** The only update path (`persistBillingUpdate`) is driven by
+     the Stripe webhook and forces `billing_provider: "stripe"`.
+     `repository.replaceSubscription(subscription, audit)` exists and can be reused.
+   - No payment record type or table exists.
+   - **Nothing acts when `current_period_end` passes.** Status
+     (`trialing | active | past_due | cancelled`) changes only through Stripe
+     webhooks, and there is no grace or read-only state.
+   - Fork patches needed (logged in `07-fork-patches.md` when made): an
+     operator-only "set manual subscription" method + route in `apps/cloud`
+     (`service.ts`, `server.ts`). Payment records and period-end evaluation go
+     either in Cloud (fork patch) or in our layer; decided in the task.
+6. The legal entity (task 0.11) no longer blocks launch billing. It still blocks
+   SMS sender-ID registration, Meta Business verification, the real-number OTP
+   test in task 0.3, and the pilot (5.6).
+
+Date / approved by: 2026-11-06, project owner.
 
 ## PD-006 — Hosting split — Proposed
 

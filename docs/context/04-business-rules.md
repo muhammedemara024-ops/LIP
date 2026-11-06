@@ -110,8 +110,19 @@ Method A — customer scans branch QR (convenience path):
 ## Subscriptions (OURS on LIP Cloud)
 
 - Plan limits (customers, branches, messages) enforced server-side under a lock (LIP Cloud quotas).
-- Billing via Kashier (PD-005): we run renewals ourselves by charging the saved
-  card token each cycle; a renewal is idempotent per (subscription, period) so a
-  retry never charges twice; payment status changes only from a verified webhook.
-- On payment failure: grace period, then read-only dashboard; customers keep
-  their balances and can still redeem (never punish the end customer).
+- Billing at launch is manual (PD-005 A1): payment is collected offline (cash,
+  InstaPay, Vodafone Cash, bank transfer) and recorded by the super admin. No
+  online payment and no stored card tokens.
+- MUST: a payment record holds café, amount in integer piasters (EGP), method,
+  reference, payment date and recorded-by, and carries a stable id so a double
+  submit records it once.
+- MUST: every change to a subscription's plan or period end is audited (actor,
+  before/after, time).
+- MUST: subscription state follows the period end date on the server; when the
+  end date passes without an extension, the café enters the grace period with
+  no human step.
+- On expiry: grace period, then read-only dashboard; customers keep their
+  balances and can still redeem (never punish the end customer).
+- Deferred (Kashier, PD-005): when online billing returns, a renewal is
+  idempotent per (subscription, period) and payment status changes only from a
+  verified webhook.

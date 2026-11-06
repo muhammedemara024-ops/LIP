@@ -17,7 +17,7 @@ It is a TypeScript/Node 22 monorepo containing:
   (evaluate → reserve → capture → accrue → adjust), spec in `spec/`.
 - A reference engine, HTTP server, Admin UI, guest wallet, SDK, CLI, MCP server.
 - `/platform/v1` — non-normative customer data, segments, campaigns, analytics.
-- `/cloud/v1` — non-normative managed control plane (orgs, plans, Stripe billing).
+- `/cloud/v1` — non-normative managed control plane (orgs, plans, billing; upstream ships Stripe, we use manual — PD-005 A1).
 
 ## What WE are building on top of it
 
@@ -54,7 +54,8 @@ lives **outside** `/lip/v1`. See `docs/context/03-gap-analysis.md`.
 8. **Points are not money** and never appear as a tender (unless stored-value credit,
    which needs a separate legal decision).
 9. A new feature not in the MVP list goes to the backlog, not into the code.
-11. Billing is **Kashier**, not Stripe (PD-005). Do not add Stripe code paths.
+11. Billing at launch is **manual** (`billing_provider: "manual"`, PD-005 A1);
+    Kashier is deferred, not removed. Do not add Stripe code paths.
 10. Do not claim something works because a test exists; run it or say it is unverified.
 
 ## Commands
@@ -90,7 +91,7 @@ above. Git remote `upstream` tracks upstream LIP tags (push disabled).
 | Messaging jobs (webhook connector only) | `packages/server/src/engagement.ts` |
 | Postgres storage + RLS | `packages/storage-postgres/` |
 | Customer identity (OIDC → customer → member) | `packages/identity/`, `apps/cloud/src/customer-*.ts` |
-| Plans, subscriptions, billing (Stripe today → Kashier, PD-005) | `apps/cloud/src/billing.ts`, `apps/cloud/src/types.ts` |
+| Plans, subscriptions, billing (manual at launch, Kashier deferred — PD-005 A1) | `apps/cloud/src/billing.ts`, `apps/cloud/src/types.ts` |
 | Admin UI (React/Vite, single 77 KB `App.tsx`) | `apps/admin/src/` |
 | Guest wallet BFF (OIDC/PKCE) | `apps/wallet/src/server.ts` |
 | Tests | `tests/unit`, `tests/conformance` |

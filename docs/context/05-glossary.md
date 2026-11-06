@@ -23,6 +23,10 @@
 | موافقة تسويقية | Marketing consent | `CustomerConsent` (per tenant) |
 | عميل مختفي | Lapsed customer | no visit for N days (rule not yet expressible, G-09) |
 | الاشتراك / الباقة | Subscription / plan | Cloud `plan_id`, subscription |
+| مدة الاشتراك | Subscription period | from start to end date; a café's access follows the end date |
+| فترة السماح | Grace period | time after the end date before the dashboard turns read-only |
+| التحصيل اليدوي | Manual billing | subscription paid offline and recorded by the super admin (PD-005 A1); Cloud `billing_provider: "manual"` |
+| إيصال دفع | Payment record | one offline payment: café, amount, method, reference, date, recorded by |
 | مفتاح منع التكرار | Idempotency key | `context.idempotency_key` |
 | النسخة الأصلية | Upstream | the original open-source LIP project we forked |
 | النسخة المثبّتة | Pinned commit | the exact upstream commit our fork is based on (PD-002) |

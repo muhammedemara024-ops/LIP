@@ -75,6 +75,9 @@ LIP بيتحقق من توكن OIDC جاهز (Clerk/Auth0) لكنه ما بيع�
 مع مئات الكافيهات وآلاف الزيارات ده هيبقى بطيء وهيضيّع بيانات تحليلات. لازم تحويلهم لجداول عادية بـ RLS قبل الإطلاق.
 
 ### G-12 · الدفع والاشتراكات في مصر — P1 — القرار: كاشير (PD-005)
+
+> Update 2026-11-06 (PD-005 A1): launch billing is manual (offline collection
+> recorded in the super-admin console); Kashier is deferred. See 01-decisions.md.
 مزود الفوترة الوحيد في LIP هو Stripe، وStripe مش متاح مباشرة للشركات المقيمة في مصر. **اتقرر استخدام كاشير.**
 كاشير ما عندوش API لإدارة الاشتراكات؛ بيحفظ توكن الكارت أول مرة وإحنا اللي بنخصم كل دورة بـ Pay with Token. يعني لازم نبني `KashierBillingProvider` على واجهة `CloudBillingProvider`، ومعاه: جدولة التجديد، إعادة المحاولة عند الفشل، فترة سماح، وسجل فواتير. والفوترة اليدوية تفضل متاحة للتجربة الأولى. الباقات الحالية Free/Pro/Business غير باقاتنا Starter/Growth/Premium. ومفيش Free trial ولا Annual ولا Invoice history ولا Dunning واضح.
 

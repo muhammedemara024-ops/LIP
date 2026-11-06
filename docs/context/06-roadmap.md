@@ -25,7 +25,7 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
 | M3 | A cashier can award and redeem in a real café flow (staging) | Phase 3 DoD |
 | M4 | Customer web app + owner dashboard MVP | Phase 4 DoD |
 | M5 | Pilot live in 1–3 real cafés | Phase 5 DoD |
-| M6 | Paid launch: Kashier billing, automation, WhatsApp, retention KPIs | Phase 6 DoD |
+| M6 | Paid launch: manual billing, automation, WhatsApp, retention KPIs | Phase 6 DoD |
 | M7 | Mobile app, geofencing, advanced analytics | Phase 7 DoD |
 
 ---
@@ -36,7 +36,7 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
 | --- | --- | --- | --- | --- | --- |
 | 0.1 | Decide PD-002: adopt LIP as loyalty core (fork + pin upstream `8ad93c8`) | — | — | PD-002 Approved or Superseded in 01-decisions.md | 2026-11-06 — Approved, conditional on 0.7 + 0.8 |
 | 0.2 | Decide PD-003: staff scan is the only path that grants value | — | — | PD-003 Approved | 2026-11-06 — Approved |
-| 0.3 | Decide PD-004: customer OTP provider + channel (SMS/WhatsApp) | G-06 | — | Provider chosen; confirmed it issues JWKS-verifiable JWTs; Egyptian delivery tested with one real number | |
+| 0.3 | Decide PD-004: customer OTP provider + channel (SMS/WhatsApp) | G-06 | 0.11 (real-number test only) | Provider chosen; confirmed it issues JWKS-verifiable JWTs; Egyptian delivery tested with one real number | |
 | 0.4 | Decide PD-006: hosting (Next.js on Vercel, LIP runtime on container host, Postgres provider) | — | 0.1 | Approved; region chosen; monthly cost estimate written | |
 | 0.5 | Decide PD-007: Arabic-first, English second | G-14 | — | Approved | |
 | 0.6 | New decision: purchase capture = bill amount only vs items | G-04 | 0.2 | Decision recorded with its effect on product exclusions | |
@@ -44,6 +44,7 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
 | 0.8 | Baseline: run Postgres profile + `lip doctor` + `lip test` | — | 0.7 | Conformance passes against Postgres runtime | |
 | 0.9 | Fix upstream AI-doc drift (`skills/lip/*`, old gap doc) or mark them non-authoritative; resolve `docs/postgres.md` "attached environment-specific disks" vs diskless `render.yaml` + release runbook | — | — | Skills and docs no longer contradict code | |
 | 0.10 | Legal pre-check: Egypt personal data law (151/2020), who is data controller (platform vs café) | — | — | Written note from counsel or explicit "deferred to Phase 5" decision | |
+| 0.11 | Legal entity: company commercial registration | — | — | Registration issued; blocks SMS sender-ID registration, Meta Business verification, the real-number test in 0.3, and the pilot (5.6) | |
 
 **DoD:** PD-002/003/004/006/007 and 0.6 approved; baseline green; drift fixed.
 
@@ -115,8 +116,8 @@ application code is written.
 | 5.2 | Load test: peak hour in 100 cafés concurrently | — | M4 | p95 accrue < 500 ms; no duplicate awards | |
 | 5.3 | Backups + restore drill on production Postgres | — | 2.2 | Restore proven, RPO/RTO recorded | |
 | 5.4 | Privacy policy, terms, consent texts (Arabic) | — | 0.10 | Published and linked in apps | |
-| 5.5 | Manual billing for pilot cafés | G-12 | 1.6 | Invoice issued outside the app | |
-| 5.6 | Pilot in 1–3 cafés; weekly review of repeat-visit rate | — | 5.1–5.5 | 4 weeks of data; issues logged to backlog | |
+| 5.5 | Manual billing core (super-admin): record a payment; set/extend plan + period end; subscription state follows end date (grace → read-only) | G-12 | 1.6, 2.2 | Payment stored in piasters with stable id (double submit records once); every plan/period change audited; a lapsed café enters grace then read-only automatically while its customers can still redeem | |
+| 5.6 | Pilot in 1–3 cafés; weekly review of repeat-visit rate | — | 5.1–5.5, 0.11 | 4 weeks of data; issues logged to backlog | |
 
 **DoD:** M5 — pilot cafés use it daily for 4 weeks with no data-integrity incident.
 
@@ -124,15 +125,15 @@ application code is written.
 
 | ID | Task | Closes | Depends on | Acceptance criteria | Done |
 | --- | --- | --- | --- | --- | --- |
-| 6.1 | `KashierBillingProvider`: save token, verified webhooks | G-12 | PD-005, M5 | HMAC verified with Payment API Key; card data never stored | |
-| 6.2 | Renewal scheduler, retries, grace period, read-only on non-payment, invoice history | G-12 | 6.1 | Renewal idempotent per (subscription, period); end customers unaffected | |
-| 6.3 | Free trial, monthly/annual, upgrade/downgrade, plan limits enforced | G-12 | 6.2 | Limits enforced server-side | |
+| 6.1 | Renewals list (ending in next 7 days + overdue) and payment history per café (super-admin) | G-12 | 5.5 | List matches period end dates; history shows every recorded payment | |
+| 6.2 | Owner dashboard: plan, end date, renewal reminder before expiry | G-12 | 5.5, 4.4 | Reminder visible before expiry; grace/read-only state shown clearly | |
+| 6.3 | Free trial, monthly/annual, upgrade/downgrade, plan limits enforced | G-12 | 5.5 | Limits enforced server-side | |
 | 6.4 | Automation engine: event triggers + "inactive N days" + birthday + near-reward + expiring | G-09 | 2.7 | Each trigger fires once per customer per rule window | |
 | 6.5 | WhatsApp Business connector (+ SMS fallback), templates, opt-out | G-10 | 6.4 | Frequency cap + send window enforced; cost counted against plan | |
 | 6.6 | Campaign attribution with holdout + retention KPIs (repeat rate, frequency, cohorts) | G-13 | 6.4 | Lift report per campaign | |
 | 6.7 | Super-admin console: businesses, plans, suspensions, usage | — | 6.3 | Operator actions audited | |
 
-**DoD:** M6 — first café pays through Kashier; automated win-back shows measurable lift vs holdout.
+**DoD:** M6 — first café's offline payment recorded and its period extended in the super-admin console; automated win-back shows measurable lift vs holdout.
 
 ## Phase 7 — Expansion (P2)
 
@@ -158,3 +159,7 @@ and isolation-test it first in Phase 2.
 - Item-level purchases / product exclusions (if 0.6 chose amount-only)
 - Referral program, gamification
 - Franchise funding settlement
+- Kashier online billing (PD-005, deferred by A1): `KashierBillingProvider`
+  (save token, HMAC-verified webhooks, card data never stored) + renewal
+  scheduler (retries, idempotent per subscription/period). Former tasks 6.1/6.2.
+  Revisit at 30 paying cafés or when manual collection becomes a bottleneck.
