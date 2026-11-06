@@ -12,6 +12,11 @@ reimplement them, call LIP. Rules marked (OURS) must be built in our layer.
 - MUST: a business sees only customers enrolled in its own program. (OURS, PD-001)
 - MUST: points and rewards never transfer between businesses. (LIP — separate programs)
 - MUST: raw phone/email never cross `/lip/v1`; only opaque `member_id`. (LIP)
+- MUST: personal data (phone, name, birthday, consent) lives only in the
+  platform customer directory, in its own schema and database role, behind its
+  own service interface. The BFF never copies phone numbers into LIP, logs,
+  analytics or message-job payloads beyond what sending requires. (OURS,
+  PD-006 — so only the directory would move if data must stay in Egypt)
 - MUST: identity values never appear in logs, URLs, or idempotency keys. (LIP spec)
 - MUST: marketing consent is stored per business with purpose, policy version,
   source and timestamp; transactional messages do not require marketing consent. (LIP platform; OURS for per-brand UI)

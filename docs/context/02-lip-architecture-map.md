@@ -3,9 +3,10 @@
 ## Layering (target)
 
 ```text
- Customer web app (Next.js, AR/EN)   Staff/cashier app (PWA)   Owner dashboard (Next.js)
-            │                                │                          │
-            └────────────── Product BFF / API (ours, TypeScript) ───────┘
+   apps/web — one Next.js app (AR/EN), three surfaces by subdomain:
+   app. (customer PWA)   staff. (cashier PWA)   dashboard. (owner)
+            │
+   apps/bff — Product BFF / API (ours, TypeScript, long-running service)
                  • customer OTP session → platform customer → member_id
                  • rotating member QR tokens, branch QR claims, pending queue
                  • staff "bill amount" → synthetic FoodserviceOrder
@@ -18,6 +19,11 @@
                  ▼
      Postgres (tenant-scoped tables, FORCE RLS on lip.tenant_id)
 ```
+
+Hosting (PD-006, round 1): LIP runtime (1 instance), BFF and web are three
+separate services per environment on one container host in Frankfurt, behind
+Cloudflare. Personal data lives only in the platform customer directory (own
+schema + DB role) so it alone could move to an Egyptian host.
 
 Super-admin / plans / subscriptions / provisioning: LIP Cloud `/cloud/v1`
 (`apps/cloud`). Billing at launch is manual (`billing_provider: "manual"`,

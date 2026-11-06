@@ -38,6 +38,8 @@
 | مسح العميل لـ QR الفرع | Customer scan (Method A) | ours (G-03); creates a pending claim only |
 | QR العضوية المتغير | Member QR code | ours: short-lived, single-use code identifying one customer at one business, computed on a registered customer device (PD-003 A1) |
 | كود التحقق | One-time code (OTP) | 6-digit sign-in code sent by WhatsApp or SMS, issued and checked by our BFF (PD-004) |
+| دليل العملاء | Customer directory | platform-level store of customers and their memberships; the only place personal data lives (G-01, PD-006) |
+| واجهة | Surface | one audience's part of the web app: customer (`app.`), staff (`staff.`), owner (`dashboard.`) |
 | جلسة العميل | Customer session | the signed-in state the BFF keeps for a customer (90 days, sliding); never seen by LIP |
 | رسالة معاملات | Transactional message | a message about the customer's own card (reward earned, reward expiring); needs no marketing consent |
 | قاطع الإرسال | OTP circuit breaker | platform-wide daily cap on OTP sends and spend; pauses sending when reached |
