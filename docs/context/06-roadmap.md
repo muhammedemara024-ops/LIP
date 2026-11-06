@@ -37,7 +37,7 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
 | 0.1 | Decide PD-002: adopt LIP as loyalty core (fork + pin upstream `8ad93c8`) | — | — | PD-002 Approved or Superseded in 01-decisions.md | 2026-11-06 — Approved, conditional on 0.7 + 0.8 |
 | 0.2 | Decide PD-003: staff scan is the only path that grants value | — | — | PD-003 Approved | 2026-11-06 — Approved |
 | 0.3 | Decide PD-004: customer OTP provider + channel (SMS/WhatsApp) | G-06 | — | Provider and channel chosen. (JWKS condition dropped: PD-004 runs OTP in our BFF, so there is no outside token to verify. Real-number delivery test moved to 2.4.) | 2026-11-06 — Approved, conditional on the 2.4 real-number test |
-| 0.4 | Decide PD-006: hosting (LIP, BFF and one Next.js app on a container host in Frankfurt; Postgres provider) | — | 0.1 | Approved; region chosen; per-service monthly cost table ≤ $100 for staging + production | |
+| 0.4 | Decide PD-006: hosting (LIP, BFF and one Next.js app on a container host in Frankfurt; Postgres provider) | — | 0.1 | Approved; region chosen; per-service monthly cost table ≤ $100 for staging + production | 2026-11-06 — Approved (Render Frankfurt, Pro workspace, Render Postgres), conditional |
 | 0.5 | Decide PD-007: Arabic-first, English second | G-14 | — | Approved | |
 | 0.6 | New decision: purchase capture = bill amount only vs items | G-04 | 0.2 | Decision recorded with its effect on product exclusions | |
 | 0.7 | Baseline: `npm ci && npm run typecheck && npm test` on Node 22 | — | — | All green, result + Node version recorded here | |
@@ -69,7 +69,7 @@ application code is written.
 | ID | Task | Closes | Depends on | Acceptance criteria | Done |
 | --- | --- | --- | --- | --- | --- |
 | 2.1 | Rebrand: remove Crave/CraveUp names, ids (`crv_cus_*`), keep LICENSE/NOTICE | — | M1 | Grep finds no upstream brand in shipped code/UI | |
-| 2.2 | CI on GitHub Actions + staging environment (Postgres, LIP runtime, secrets manager) | — | 0.4 | Push to main deploys staging; tests required to merge | |
+| 2.2 | CI on GitHub Actions + staging environment (Postgres, LIP runtime, secrets manager) | — | 0.4 | Push to main deploys staging on Render (Frankfurt); tests required to merge; Postgres lease conformance + `lip test` pass against the Render staging DB (PD-006 condition) | |
 | 2.3 | Platform customer directory above tenants (customers, memberships → member_id) | G-01 | 2.2 | One phone = one customer across cafés; café A cannot read café B's membership (RLS test); personal data (phone, name, birthday, consent) only in the directory's own schema + DB role behind its own service interface; no phone in LIP, logs, analytics or message payloads beyond sending (PD-006) | |
 | 2.4 | Customer OTP sign-in run by the BFF (own OTP, WhatsApp Cloud API + Egyptian SMS provider; PD-004) | G-06 | 0.3, 2.3, 0.11 | Sign-in works end-to-end; customer session never reaches LIP; codes stored as HMAC, constant-time compare, one active code per phone; session ids ≥ 256 bits stored hashed, Secure/httpOnly/SameSite cookies, CSRF protection; per-phone/IP/device limits, Turnstile and global circuit breaker enforced; phone change revokes all sessions; WebOTP autofill works on Android; Arabic SMS fits one segment; Egyptian delivery tested with one real number over WhatsApp and SMS (moved from 0.3; PD-004 condition) | |
 | 2.5 | Cashier role: protocol write limited to accrue/redeem at own location; minimal customer view | G-05 | 2.2 | Permission tests: cashier cannot export, edit program, post manual adjustments, or act in other branch; staff phone OTP-verified at creation, change needs owner approval | |
@@ -114,7 +114,7 @@ application code is written.
 | --- | --- | --- | --- | --- | --- |
 | 5.1 | Security review: tenant isolation, authz, QR abuse, OTP abuse, secrets; explicitly the OTP and session code (PD-004) | — | M4 | Findings fixed or accepted in writing | |
 | 5.2 | Load test: peak hour in 100 cafés concurrently | — | M4 | p95 accrue < 500 ms; no duplicate awards | |
-| 5.3 | Backups + restore drill on production Postgres | — | 2.2 | Restore proven, RPO/RTO recorded | |
+| 5.3 | Backups + restore drill on production Postgres | — | 2.2 | Restore proven using Render Postgres point-in-time restore (not an upstream local backup command); RPO/RTO recorded (PD-006) | |
 | 5.4 | Privacy policy, terms, consent texts (Arabic) | — | 0.10 | Published and linked in apps | |
 | 5.5 | Manual billing core (super-admin): record a payment; set/extend plan + period end; subscription state follows end date (grace → read-only → suspended) | G-12 | 1.6, 2.2 | Payment stored in piasters with stable id (double submit records once); payment records append-only; every plan/period change audited; a lapsed café moves grace (1–7) → read-only (8–37) → suspended (38+) automatically; suspended café cannot award but its customers can redeem; recording a payment restores full service at once | |
 | 5.6 | Pilot in 1–3 cafés; weekly review of repeat-visit rate | — | 5.1–5.5, 0.10, 0.11 | 4 weeks of data; issues logged to backlog | |

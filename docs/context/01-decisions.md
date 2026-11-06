@@ -378,7 +378,7 @@ Follow-ups approved 2026-11-06:
 
 Date / approved by: 2026-11-06, project owner.
 
-## PD-006 — Hosting split and Postgres provider — Proposed (round 1 agreed 2026-11-06; provider/host open)
+## PD-006 — Hosting split and Postgres provider — Approved (2026-11-06, conditional)
 
 Context: the LIP runtime deployed by `render.yaml` (`node apps/cloud/dist/cli.js`)
 is one process running the control plane and every café's LIP runtime against
@@ -386,57 +386,99 @@ one shared database behind one listener (`apps/cloud/src/managed-data-plane.ts`)
 it must run as one instance (PD-002) and refuses to share a database or role
 between sandbox and production. No AWS/GCP/Azure, Supabase, Neon, Render or Fly
 region exists in Egypt; Frankfurt is the nearest everywhere (research 2026-11-06).
+Options considered for Postgres: Supabase (7-day PITR add-on $100/month alone
+breaks the budget; direct connection IPv6-only), Neon Launch, Render Postgres.
 
-Agreed in round 1 (2026-11-06):
-1. *BFF* is a long-running Node service on the container host (not serverless),
-   in the same region as LIP and the database. It runs timers (claim expiry,
-   subscription stages, OTP circuit breaker, message sending) and holds the
-   merchant key. If the BFF ever runs more than one instance, those timers run
-   under a Postgres lease or a single worker so scale-out cannot double-run
-   them (same lesson as task 2.7).
+Decision: everything runs on **Render, region Frankfurt, Pro workspace**: three
+services per environment (LIP runtime, BFF, one Next.js web app) and **Render
+Postgres**, for staging and production, behind Cloudflare.
+
+**Conditions** (PD-006 reopens if any fails):
+1. Before task 2.2 is done: the Postgres lease conformance test and `lip test`
+   pass against the Render staging database (proves session advisory locks work
+   on a direct Render Postgres connection).
+2. Confirm on Render's billing page: whether the Pro fee is per workspace or per
+   seat; whether point-in-time restore is billed extra; whether suspended
+   services are billed. If the fee is per seat, record the seats we actually need
+   (currently 1: the project owner) and recompute the total.
+3. The confirmed monthly total stays ≤ $100, after the fallback below.
+4. The restore drill (task 5.3) uses Render Postgres point-in-time restore, not
+   an upstream local backup command.
+
+Consequences:
+
+*Topology*
+1. *BFF* is a long-running Node service (not serverless), in the same region as
+   LIP and the database. It runs timers (claim expiry, subscription stages, OTP
+   circuit breaker, message sending) and holds the merchant key. If the BFF ever
+   runs more than one instance, those timers run under a Postgres lease or a
+   single worker so scale-out cannot double-run them (same lesson as task 2.7).
 2. *LIP and BFF are separate services.* LIP stays at 1 instance; the BFF can
-   scale later. They talk over the host's private network; only the BFF reaches
+   scale later. They talk over Render's private network; only the BFF reaches
    LIP; only the BFF environment holds the merchant key.
 3. *One Next.js app* (`apps/web`) serves the customer, staff and owner surfaces,
-   routed by subdomain (`app.`, `staff.`, `dashboard.`), on the same container
-   host with Cloudflare as CDN in front. Code stays split by surface inside the
-   app so it can be split later. Reason: budget — 3 services per environment
-   (LIP, BFF, web) instead of 5. All surfaces and `api.` live under one
-   registrable domain so PD-004's SameSite cookies work. Our apps are therefore
-   `apps/bff` and `apps/web` (supersedes the example list in PD-002's fork rules).
+   routed by subdomain (`app.`, `staff.`, `dashboard.`), with Cloudflare as CDN
+   in front. Code stays split by surface inside the app so it can be split
+   later. All surfaces and `api.` live under one registrable domain so PD-004's
+   SameSite cookies work. Our apps are `apps/bff` and `apps/web` (supersedes the
+   example list in PD-002's fork rules).
 4. *Environments:* staging and production only, each with its own database and
    roles; local development uses `docker compose --profile postgres`. Staging
-   may use the smallest sizes and may be paused when unused, if the provider
-   allows it without breaking advisory locks.
-5. *Postgres connections:* every service connects directly or through a
-   session-mode pooler, never transaction mode. (Correction carried from
-   PD-002 review: a session-mode pooler keeps one server connection per client
-   session, so session advisory locks work; only transaction mode is ruled out.)
-6. *Backups:* production needs point-in-time restore of at least 7 days, plus
-   the restore drill (task 5.3) before the pilot. A provider that cannot do this
-   is out. Round 2 verifies whether 7-day PITR on Render needs a paid workspace
-   plan and includes that cost.
-7. *Budget:* ≤ $100/month for staging and production together (hosting,
-   database, CDN; messaging excluded) until the first paying cafés. Memory for
-   the LIP process (all cafés in one process) is **unmeasured**; task 0.8
-   reports its idle memory so it can be sized.
-8. *Region:* Frankfurt for staging and production. Legal facts below are
-   **unverified (secondary sources)**: Egypt's PDPL 151/2020 executive
-   regulations were reportedly issued in November 2025; transferring personal
-   data outside Egypt reportedly needs a permit from the Personal Data
-   Protection Center (Reg. Art. 16); the one-year grace period reportedly ended
-   around 1 November 2026; whether the Center issues permits yet is unclear.
-   Task 0.10 is therefore a hard gate before the pilot (5.6). If counsel says
-   data must stay in Egypt, PD-006 reopens for Egyptian hosting.
-9. *Design hedge* so an "Egypt-only" answer does not force a full re-host:
-   personal data (phone, name, birthday, consent) lives only in the platform
-   customer directory (G-01, task 2.3), in its own schema and database role,
-   behind its own service interface. LIP keeps only opaque `member_id` values.
-   The BFF never copies phone numbers into LIP, logs, analytics or message-job
-   payloads beyond what sending requires. Only the customer directory would
-   then need to move to an Egyptian host.
+   uses the smallest sizes and may be paused when unused, if that does not break
+   advisory locks.
 
-Open for round 2: Postgres provider, container host, per-service cost table.
+*Database*
+5. *Connections:* every service connects directly or through a session-mode
+   pooler, never transaction mode. A session-mode pooler keeps one server
+   connection per client session, so session advisory locks work; only
+   transaction mode is ruled out. Render Postgres has no built-in pooler; we use
+   its direct internal connection.
+6. *Backups:* production keeps 7-day point-in-time restore (needs the Pro
+   workspace; Hobby keeps 3 days). Restore drill per condition 4.
+
+*Cost* (USD/month, research 2026-11-06; items in condition 2 unverified)
+
+| Item | Production | Staging |
+| --- | --- | --- |
+| Render Pro workspace | 25 (shared) | — |
+| LIP runtime (0.5 CPU / 512 MB) | 7 | 7 |
+| BFF (0.5 CPU / 512 MB) | 7 | 7 |
+| Web app (0.5 CPU / 512 MB) | 7 | 7 |
+| Render Postgres | 19 (1 GB) + 3 (10 GB storage) | 6 (256 MB) + 3 (10 GB storage) |
+| Cloudflare (free plan) | 0 | 0 |
+| **Subtotal** | **68** | **30** |
+| **Total** | **98** | |
+
+Domain name (~$1/month) and messaging (WhatsApp/SMS) are not included.
+
+7. *Memory risk:* memory for the LIP process (all cafés in one process) is
+   **unmeasured**; task 0.8 reports its idle memory. If production LIP needs the
+   next size (1 CPU / 2 GB, $25, +$18 → ≈ $116), the fallback, in order:
+   1. Suspend staging's three services when unused (saves $21 if suspended
+      services are not billed — to be confirmed).
+   2. Raise the cap to $125 **only with the project owner's explicit approval at
+      that time**; never applied automatically.
+8. *Budget:* ≤ $100/month for staging and production together (hosting,
+   database, CDN; messaging excluded) until the first paying cafés.
+
+*Region and law*
+9. Frankfurt for staging and production. Legal facts below are **unverified
+   (secondary sources)**: Egypt's PDPL 151/2020 executive regulations were
+   reportedly issued in November 2025; transferring personal data outside Egypt
+   reportedly needs a permit from the Personal Data Protection Center (Reg.
+   Art. 16); the one-year grace period reportedly ended around 1 November 2026;
+   whether the Center issues permits yet is unclear. Task 0.10 is therefore a
+   hard gate before the pilot (5.6). If counsel says data must stay in Egypt,
+   PD-006 reopens for Egyptian hosting.
+10. *Design hedge* so an "Egypt-only" answer does not force a full re-host:
+    personal data (phone, name, birthday, consent) lives only in the platform
+    customer directory (G-01, task 2.3), in its own schema and database role,
+    behind its own service interface. LIP keeps only opaque `member_id` values.
+    The BFF never copies phone numbers into LIP, logs, analytics or message-job
+    payloads beyond what sending requires. Only the customer directory would
+    then need to move to an Egyptian host.
+
+Date / approved by: 2026-11-06, project owner.
 
 ## PD-007 — Languages — Proposed (brief says "suggested")
 
