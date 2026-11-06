@@ -201,49 +201,93 @@ Consequences:
 
 Date / approved by: 2026-11-06, project owner.
 
-## PD-004 — Customer authentication: phone OTP — Proposed (round 1 agreed 2026-11-06; provider open)
+## PD-004 — Customer authentication: phone OTP run by our BFF — Approved (2026-11-06, conditional)
 
-Context: LIP does not authenticate customers (G-06). LIP's verifier
-(`packages/identity/src/oidc.ts`) accepts only RS256/ES256 JWTs whose keys come
-from an HTTPS JWKS endpoint.
+Context: LIP does not authenticate customers (G-06). Options considered:
+Supabase Auth phone OTP (+ Send SMS Hook), our own OTP in the BFF, Twilio
+Verify, Firebase phone auth. Research on 2026-11-06: Supabase signs ES256/RS256
+with a JWKS but its built-in WhatsApp is Twilio-only and its user table would
+duplicate our customer directory (G-01); Twilio Verify costs $0.05 + channel
+(≈ $0.45 per SMS code to Egypt); Firebase is SMS-only with no sender control.
+
+Decision: we run OTP in our own BFF. Codes go out by WhatsApp first (Meta
+WhatsApp Cloud API, direct) with SMS fallback through an Egyptian SMS provider.
+The BFF creates the customer session itself; there is no outside identity
+provider and no outside token.
+
+**Condition:** the real-number delivery test in task 2.4 (WhatsApp and SMS to a
+real Egyptian number) must pass. If delivery fails, the channel/provider choice
+reopens. Phase 0 can close on this conditional approval.
 
 **Assumption:** the legal entity (task 0.11, not yet registered) will be
-Egyptian-registered. SMS sender-ID registration and Meta Business verification
-wait for it. PD-004 stays Proposed until the real-number delivery test (task 2.4).
+Egyptian-registered. SMS sender-ID registration, Meta Business verification and
+WhatsApp authentication-template approval all wait for it.
 
-Agreed in round 1 (2026-11-06):
-1. *Token check:* the BFF verifies the provider's token with `packages/identity`
-   used as a library (no fork patch), maps it to the platform customer →
-   `member_id`, and calls LIP with the merchant key. The LIP server never sees
-   a customer token.
-2. *Phone is a credential, not the identity:* the platform customer id is
-   stable. Changing the number requires being signed in plus an OTP to the new
-   number, and revokes every existing session and device secret (PD-003 A1).
-   The reused-number risk is accepted for the MVP; a support procedure detaches
-   a number from an account after checks.
-3. *Abuse limits* (all proposed starting values): Egyptian mobile numbers only
-   (`+20 1x…`); 6-digit code valid 5 min; resend cooldown 60 s; per phone ≤ 5
-   sends/hour and ≤ 10/day; ≤ 5 wrong attempts per code; per-IP and per-device
-   limits; a bot check (e.g. Cloudflare Turnstile) before the first send; a
-   platform-wide **circuit breaker** — global daily caps on OTP sends and on OTP
-   spend; reaching either pauses sending and alerts the platform admin.
-4. *Session:* sliding 90-day httpOnly cookie set by the BFF; "sign out of all
-   devices"; a fresh OTP only for account deletion and phone change.
-5. *Offline member QR:* see PD-003 A1.
-6. *Cost:* OTP is a platform cost, not counted against a café's message
-   allowance; it feeds plan pricing (task 1.6).
-7. *Channel:* WhatsApp first (authentication template with a copy-code
-   button); SMS fallback after the 60 s cooldown or when the number is not on
-   WhatsApp, through an Egyptian SMS provider with a registered sender ID.
-   If Supabase Auth is used, WhatsApp goes through the Send SMS Hook to a sender
-   we choose (Supabase's built-in WhatsApp is Twilio-only).
-   - Price, **unverified**: WhatsApp authentication ≈ $0.0036/message per a
-     third-party copy of Meta's rate card; the domestic vs international
-     authentication rate depends on where the WhatsApp Business account is
-     registered. Verify against Meta's official rate card before task 1.6.
-   - Price, verified: Twilio SMS to Egypt $0.3959/segment (2026-11-06).
+Consequences:
 
-Open for round 2: provider.
+*Identity and session*
+- No outside token: the round-1 requirement "the BFF verifies the provider's
+  token with `packages/identity`" is superseded, and the JWKS condition is
+  dropped from task 0.3. The LIP server still never sees a customer session;
+  the BFF maps the platform customer → `member_id` and calls LIP with the
+  merchant key.
+- The phone number is a credential, not the identity: the platform customer id
+  is stable. Changing the number requires being signed in plus an OTP to the new
+  number, and revokes every existing session and device secret (PD-003 A1).
+  The reused-number risk is accepted for the MVP; a support procedure detaches
+  a number from an account after checks.
+- Session: sliding 90 days; "sign out of all devices"; a fresh OTP only for
+  account deletion and phone change.
+- The same OTP service verifies staff phone numbers (PD-003).
+
+*Security requirements (security-critical code)*
+- Codes are stored as an HMAC with a server-side secret, never plain or as a
+  plain hash (a 6-digit code space is reversible in seconds).
+- Codes are compared in constant time. One active code per phone; issuing a new
+  code invalidates the previous one.
+- Session ids are random (≥ 256 bits) and stored hashed; cookies are httpOnly +
+  Secure + SameSite; state-changing requests have CSRF protection.
+- Node's built-in `crypto` only; no hand-rolled primitives.
+- Task 5.1 (security review) explicitly covers the OTP and session code.
+
+*Abuse limits* (proposed starting values)
+- Egyptian mobile numbers only (`+20 1x…`); 6-digit code valid 5 min; resend
+  cooldown 60 s; per phone ≤ 5 sends/hour and ≤ 10/day; ≤ 5 wrong attempts per
+  code; per-IP and per-device limits.
+- Bot check (Cloudflare Turnstile) before the first send.
+- Platform-wide circuit breaker: global daily caps on OTP sends and on OTP
+  spend; reaching either pauses sending and alerts the platform admin.
+
+*Channels*
+- WhatsApp: authentication template with a copy-code button, via Meta's
+  WhatsApp Cloud API directly (no reseller), under a WhatsApp Business account
+  of the Egyptian entity. Codes use a sender number separate from the future
+  marketing number (task 6.5) so marketing complaints cannot hurt code delivery.
+  Authentication templates need Meta approval (0.11-dependent setup).
+- SMS fallback after the 60 s cooldown or when the number is not on WhatsApp,
+  through an Egyptian SMS provider chosen from at least 2 quotes (e.g. Cequens,
+  Victory Link, SMS Misr) on: price per Arabic segment, sender-ID registration
+  support, delivery-report API, uptime. Choice recorded before task 2.4.
+  Twilio is not used.
+- SMS text is in Arabic, formatted for the WebOTP API (last line
+  `@<our domain> #<code>`) so Android browsers autofill the code in the PWA, and
+  must fit one 70-character UCS-2 segment. Check against the final domain:
+  `رمز الدخول: 123456` + newline + `@<domain> #123456` is 28 characters plus
+  the domain, so the domain may be at most 42 characters (less if more text is
+  added).
+
+*Cost*
+- OTP is a platform cost, not counted against a café's message allowance; it
+  feeds plan pricing (task 1.6).
+- WhatsApp authentication ≈ $0.0036/message is **unverified** (third-party copy
+  of Meta's rate card); the domestic vs international authentication rate
+  depends on where the WhatsApp Business account is registered. Verify against
+  Meta's official rate card before task 1.6. Verified for comparison: Twilio
+  SMS to Egypt $0.3959/segment (2026-11-06).
+
+*Offline member QR:* see PD-003 A1.
+
+Date / approved by: 2026-11-06, project owner.
 
 ## PD-005 — Billing provider: Kashier — Approved (2026-11-06); amended 2026-11-06 (A1: manual billing at launch, Kashier deferred)
 
@@ -327,6 +371,10 @@ Follow-ups approved 2026-11-06:
     period) in `apps/cloud`, reusing `repository.replaceSubscription` with
     audit. Logged in `07-fork-patches.md` when written.
 11. Task 0.11 (legal entity) approved as written.
+12. During the suspended stage, point and reward expiry keep running as
+    configured, and no message about the café's billing is sent to customers.
+    No marketing messages go to that café's customers; transactional messages
+    (reward earned, reward expiring) still go out.
 
 Date / approved by: 2026-11-06, project owner.
 

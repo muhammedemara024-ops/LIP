@@ -104,9 +104,32 @@ Method A — customer scans branch QR (convenience path):
 - Owner alert on anomalies: many scans of the same customer in a short window,
   scans outside opening hours, a staff member awarding to the same few customers.
 
+## Customer sign-in (OURS, PD-004)
+
+- MUST: OTP codes are stored as an HMAC with a server-side secret (never plain
+  or plain-hashed), compared in constant time; one active code per phone, and a
+  new code invalidates the previous one.
+- MUST: session ids are random (≥ 256 bits) and stored hashed; cookies are
+  httpOnly + Secure + SameSite; state-changing requests carry CSRF protection.
+- MUST: Node's built-in `crypto` only; no hand-rolled primitives.
+- MUST: only Egyptian mobile numbers (`+20 1x…`) at launch.
+- MUST: bot check (Turnstile) before the first send; per-phone, per-IP and
+  per-device limits; a platform-wide circuit breaker (daily caps on OTP sends
+  and spend) pauses sending and alerts the platform admin.
+- MUST: changing the phone number requires an OTP to the new number and
+  revokes every session and device secret.
+- Defaults: 6-digit code, valid 5 min; resend cooldown 60 s; per phone ≤ 5
+  sends/hour, ≤ 10/day; ≤ 5 wrong attempts per code; session slides 90 days.
+- Channel: WhatsApp authentication template first; SMS fallback in Arabic,
+  WebOTP-formatted (`@<domain> #<code>` last line), one 70-character segment.
+- OTP cost is a platform cost, never counted against a café's message allowance.
+
 ## Messaging & automation (OURS, P1)
 
 - MUST: marketing sends require per-brand marketing consent; every message has opt-out.
+- MUST: no marketing messages go to the customers of a café in the suspended
+  stage; transactional messages (reward earned, reward expiring) still go out.
+  (PD-005 A1)
 - Default frequency cap: max 2 marketing messages per customer per brand per 7 days.
 - Default send window: 10:00–21:00 Africa/Cairo.
 - MUST: never send an offer that is expired or already redeemed.
@@ -135,6 +158,8 @@ Method A — customer scans branch QR (convenience path):
   3. Suspended, after day 37: no new awards; customers can still redeem what
      they hold. Balances are never removed.
 - MUST: recording a payment restores full service immediately.
+- During suspension, point and reward expiry keep running as configured;
+  customers are never messaged about a café's billing.
 - Deferred (Kashier, PD-005): when online billing returns, a renewal is
   idempotent per (subscription, period) and payment status changes only from a
   verified webhook.
