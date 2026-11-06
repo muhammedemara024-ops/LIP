@@ -24,7 +24,9 @@
 | عميل مختفي | Lapsed customer | no visit for N days (rule not yet expressible, G-09) |
 | الاشتراك / الباقة | Subscription / plan | Cloud `plan_id`, subscription |
 | مدة الاشتراك | Subscription period | from start to end date; a café's access follows the end date |
-| فترة السماح | Grace period | time after the end date before the dashboard turns read-only |
+| فترة السماح | Grace period | first stage after the end date (default days 1–7): everything still works |
+| وضع القراءة فقط | Read-only stage | second stage (default days 8–37): owner cannot change program, campaigns or staff; cashiers still award and redeem |
+| إيقاف الخدمة | Suspended stage | third stage (after day 37): no new awards; customers can still redeem; balances kept |
 | التحصيل اليدوي | Manual billing | subscription paid offline and recorded by the super admin (PD-005 A1); Cloud `billing_provider: "manual"` |
 | إيصال دفع | Payment record | one offline payment: café, amount, method, reference, date, recorded by |
 | مفتاح منع التكرار | Idempotency key | `context.idempotency_key` |

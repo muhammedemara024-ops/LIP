@@ -226,8 +226,8 @@ Consequences:
    - Payment history per café.
 3. The café owner sees the plan, end date and a renewal reminder in their
    dashboard before expiry.
-4. Expiry behavior is unchanged (04-business-rules): grace period, then
-   read-only dashboard; customers keep their balances and can still redeem.
+4. Expiry behavior: see the three stages in follow-up 7 below (supersedes the
+   earlier "grace period, then read-only" wording).
 5. Use LIP Cloud's existing `billing_provider: "manual"`; no new provider.
    Verified in code on 2026-11-06 (tests not run):
    - `"manual"` is already the default when an organization is created, with a
@@ -246,7 +246,24 @@ Consequences:
      either in Cloud (fork patch) or in our layer; decided in the task.
 6. The legal entity (task 0.11) no longer blocks launch billing. It still blocks
    SMS sender-ID registration, Meta Business verification, the real-number OTP
-   test in task 0.3, and the pilot (5.6).
+   test (now in task 2.4), and the pilot (5.6).
+
+Follow-ups approved 2026-11-06:
+7. Three stages after the period end date (proposed defaults):
+   1. **Grace**, days 1–7: everything works normally.
+   2. **Read-only**, days 8–37: the owner cannot change program, campaigns or
+      staff. Cashiers keep awarding and redeeming.
+   3. **Suspended**, after day 37: no new awards. Customers can still redeem
+      what they already hold. Balances are never removed.
+   Recording a payment restores full service immediately.
+8. Payment records are append-only: never edited or deleted; a mistake is
+   corrected with a reversing entry.
+9. Subscription status follows the period end date automatically on the
+   server (no human step).
+10. Fork patch approved: a super-admin-only "set manual subscription" (plan +
+    period) in `apps/cloud`, reusing `repository.replaceSubscription` with
+    audit. Logged in `07-fork-patches.md` when written.
+11. Task 0.11 (legal entity) approved as written.
 
 Date / approved by: 2026-11-06, project owner.
 

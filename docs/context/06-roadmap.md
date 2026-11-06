@@ -116,7 +116,7 @@ application code is written.
 | 5.2 | Load test: peak hour in 100 cafés concurrently | — | M4 | p95 accrue < 500 ms; no duplicate awards | |
 | 5.3 | Backups + restore drill on production Postgres | — | 2.2 | Restore proven, RPO/RTO recorded | |
 | 5.4 | Privacy policy, terms, consent texts (Arabic) | — | 0.10 | Published and linked in apps | |
-| 5.5 | Manual billing core (super-admin): record a payment; set/extend plan + period end; subscription state follows end date (grace → read-only) | G-12 | 1.6, 2.2 | Payment stored in piasters with stable id (double submit records once); every plan/period change audited; a lapsed café enters grace then read-only automatically while its customers can still redeem | |
+| 5.5 | Manual billing core (super-admin): record a payment; set/extend plan + period end; subscription state follows end date (grace → read-only → suspended) | G-12 | 1.6, 2.2 | Payment stored in piasters with stable id (double submit records once); payment records append-only; every plan/period change audited; a lapsed café moves grace (1–7) → read-only (8–37) → suspended (38+) automatically; suspended café cannot award but its customers can redeem; recording a payment restores full service at once | |
 | 5.6 | Pilot in 1–3 cafés; weekly review of repeat-visit rate | — | 5.1–5.5, 0.11 | 4 weeks of data; issues logged to backlog | |
 
 **DoD:** M5 — pilot cafés use it daily for 4 weeks with no data-integrity incident.

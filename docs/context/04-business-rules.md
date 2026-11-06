@@ -116,13 +116,18 @@ Method A — customer scans branch QR (convenience path):
 - MUST: a payment record holds café, amount in integer piasters (EGP), method,
   reference, payment date and recorded-by, and carries a stable id so a double
   submit records it once.
+- MUST: payment records are append-only; a mistake is corrected with a
+  reversing entry, never an edit or delete.
 - MUST: every change to a subscription's plan or period end is audited (actor,
   before/after, time).
-- MUST: subscription state follows the period end date on the server; when the
-  end date passes without an extension, the café enters the grace period with
-  no human step.
-- On expiry: grace period, then read-only dashboard; customers keep their
-  balances and can still redeem (never punish the end customer).
+- MUST: subscription state follows the period end date on the server, with no
+  human step. Stages after the end date (defaults):
+  1. Grace, days 1–7: everything works normally.
+  2. Read-only, days 8–37: owner cannot change program, campaigns or staff;
+     cashiers keep awarding and redeeming.
+  3. Suspended, after day 37: no new awards; customers can still redeem what
+     they hold. Balances are never removed.
+- MUST: recording a payment restores full service immediately.
 - Deferred (Kashier, PD-005): when online billing returns, a renewal is
   idempotent per (subscription, period) and payment status changes only from a
   verified webhook.
