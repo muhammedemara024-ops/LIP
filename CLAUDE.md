@@ -7,8 +7,10 @@ tasks whose phase gate is closed or that depend on a Proposed decision.
 
 ## What this repository is
 
-This is a downloaded copy of the open-source **Loyalty Interchange Protocol (LIP)**
-v0.2.0 (Apache-2.0, upstream `craveup-oss/loyalty-interchange-protocol`).
+This is a fork of the open-source **Loyalty Interchange Protocol (LIP)**
+(Apache-2.0, upstream `craveup-oss/loyalty-interchange-protocol`), pinned to
+unreleased upstream `main` at `8ad93c81a414f5f7521061ddd88009083f4857aa`
+(package version 0.2.0, 80 commits after tag `v0.2.0`). See PD-002.
 It is a TypeScript/Node 22 monorepo containing:
 
 - `/lip/v1` — a normative, vendor-neutral loyalty **transaction protocol**
@@ -32,10 +34,12 @@ lives **outside** `/lip/v1`. See `docs/context/03-gap-analysis.md`.
 
 ## Golden rules (do not break)
 
-1. **Never change `/lip/v1` semantics or `spec/`** to fit our product. Put product
-   behavior in our own layer (BFF / `/platform/v1` extensions / new apps).
-   If the spec seems wrong, write it up in `docs/context/01-decisions.md` as a
-   *proposed* decision and stop.
+1. **Code inside upstream packages may be modified; `/lip/v1` wire semantics and
+   `spec/` may not.** Every modification to upstream code is logged in
+   `docs/context/07-fork-patches.md` so a later upgrade stays possible (PD-002).
+   Prefer putting product behavior in our own layer (BFF / `/platform/v1`
+   extensions / new apps). If the spec seems wrong, write it up in
+   `docs/context/01-decisions.md` as a *proposed* decision and stop.
 2. **Money is integer minor units.** EGP 45.50 = `{ "amount": 4550, "currency": "EGP" }`.
    Never use floats for money or points.
 3. **Every write carries an idempotency key and a stable business id**
@@ -67,8 +71,8 @@ npm run lip -- test   http://127.0.0.1:3210 --api-key lip-dev-key
 docker compose --profile postgres up --build   # Postgres-backed runtime on :3211
 ```
 
-Note: this copy has no `.git` and no `node_modules`; run `npm ci` and `git init`
-before relying on any of the above.
+Note: this copy has no `node_modules`; run `npm ci` before relying on any of the
+above. Git remote `upstream` tracks upstream LIP tags (push disabled).
 
 ## Where things are
 

@@ -24,3 +24,8 @@
 | عميل مختفي | Lapsed customer | no visit for N days (rule not yet expressible, G-09) |
 | الاشتراك / الباقة | Subscription / plan | Cloud `plan_id`, subscription |
 | مفتاح منع التكرار | Idempotency key | `context.idempotency_key` |
+| النسخة الأصلية | Upstream | the original open-source LIP project we forked |
+| النسخة المثبّتة | Pinned commit | the exact upstream commit our fork is based on (PD-002) |
+| تعديل على الـ fork | Fork patch | any change we make to upstream code; never to `/lip/v1` semantics or `spec/` |
+| قلب الولاء | Loyalty core | the LIP parts we ship: protocol, engine, storage, identity, SDK, Cloud |
+| مرجع | Reference package | an upstream part we read but do not ship (e.g. upstream Admin, wallet) |

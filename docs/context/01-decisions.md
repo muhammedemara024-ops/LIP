@@ -30,17 +30,91 @@ identity *above* tenants. See gap G-01 in `03-gap-analysis.md`.
 
 ---
 
-## PD-002 — Use LIP as the loyalty core — Proposed
+## PD-002 — Use LIP as the loyalty core — Approved (2026-11-06, conditional)
 
-Adopt LIP's engine, ledger, idempotency, reservations, Postgres storage and RLS
-as the loyalty core instead of writing our own `transactions` /
-`stamp_balances` / `point_transactions` tables. Build our product (owner
-dashboard, staff app, customer web app, automation, billing) around it.
+Context: LIP's engine, ledger, idempotency, reservations, Postgres storage and
+RLS already address the hardest correctness problems (double-award, refunds,
+expiry lots, reservation races, tenant isolation). Alternative considered:
+borrow the spec and patterns only and write our own engine. Risks: upstream is
+a v0.x working draft; its Admin UI and platform layer do not fit our users;
+branding must change.
 
-Why: the hardest correctness problems (double-award, refunds, expiry lots,
-reservation races, tenant isolation) are already specified and tested.
-Risks: upstream is a v0.x draft; Admin UI and platform layer do not fit our
-users; branding must change. Alternative: borrow the spec and patterns only.
+Decision: fork LIP and adopt it as the loyalty core instead of writing our own
+`transactions` / `stamp_balances` / `point_transactions` tables. Build the
+product (BFF, owner dashboard, staff app, customer web app, automation,
+billing) around it in the same monorepo.
+
+**Condition:** tasks 0.7 and 0.8 must pass before Phase 2 starts or any
+application code is written. Task 0.4 and Phase 1 may proceed in parallel.
+A material baseline failure reopens this decision (exit criterion 1).
+
+Consequences:
+
+*Pin*
+- Pinned to upstream commit `8ad93c81a414f5f7521061ddd88009083f4857aa`
+  (`upstream/main`, 2026-09-18; package version 0.2.0).
+- This is **unreleased upstream main, not a tagged release.** It is 80 commits
+  after tag `v0.2.0` (2026-08-15) and contains work not in that tag (Postgres
+  lease conformance test, live tenant-isolation tests, platform OpenAPI). Because
+  it was never released, baseline tasks 0.7 and 0.8 matter more, not less.
+- Upgrade plan: stay on this commit; move to the first upstream tag that
+  contains it.
+- Our only difference from that commit at approval time is `.gitignore`
+  (logged in `07-fork-patches.md`) plus our own docs.
+
+*Scope*
+- Core (shipped): `packages/protocol`, `packages/reference`, `packages/server`,
+  `packages/storage` (the interface `storage-postgres` depends on),
+  `packages/storage-postgres`, `packages/identity`, `packages/sdk` (our BFF
+  calls LIP through it), `apps/cloud` (orgs, plans, quotas; billing via
+  Kashier per PD-005).
+- Dev tool (not shipped): `packages/cli` (`lip doctor`, `lip test`).
+- Reference only (not shipped): `apps/admin`, `apps/wallet`, `packages/mcp`,
+  `packages/adapter-kit`, `packages/storage-sqlite`, `docs-site`, `landing`.
+  Their replacements are G-07 (customer app) and G-08 (owner dashboard).
+
+*Fork rules*
+- Code inside upstream packages may be modified; `/lip/v1` wire semantics and
+  `spec/` may not (golden rule 1 in `CLAUDE.md`).
+- Every modification to upstream code is logged in `07-fork-patches.md`
+  (file, reason, PD reference, upgrade impact). Expected early entries:
+  cashier role (G-05, `access-control.ts`), platform storage (G-11).
+- One monorepo; our apps live in new directories next to upstream code
+  (e.g. `apps/bff`, `apps/staff`, `apps/customer`, `apps/dashboard`).
+
+*Upstream updates*
+- Git remote `upstream` → `craveup-oss/loyalty-interchange-protocol`, tags
+  tracked, push disabled.
+- No automatic pulls. Take upstream changes only for security fixes or spec
+  changes we want; each one gets its own PD entry.
+- Apply them as a patch: `git diff <pinned commit> <upstream tag or commit>`,
+  applied with `git apply -3` (our history does not share upstream's, so
+  merges are not possible). Never port by hand from scratch.
+
+*Scaling* (verified by reading code and docs on 2026-11-06; tests not yet run)
+- `/lip/v1` protocol path: safe on multiple instances (per-request
+  tenant/program advisory transaction lock + revision check; `docs/postgres.md`).
+- Platform layer (campaign, engagement and membership schedulers, cached
+  platform state, webhook dispatcher): **one instance per tenant until task 2.7
+  is done.** The schedulers are per-process `setInterval`; `withLease()` exists
+  in `storage-postgres` with conformance tests but has no production caller;
+  upstream's own guidance is "run at most one platform instance per tenant".
+  This — not SQLite (the blueprint is diskless Neon Postgres) — is why
+  `render.yaml` sets `numInstances: 1`.
+- MVP and pilot run on a single instance. Task 2.7 makes the platform layer
+  multi-instance-safe.
+- Postgres must be reached through a direct endpoint. Transaction poolers
+  (PgBouncer transaction mode, Neon `-pooler` hosts) are rejected at boot
+  because session advisory leases break under them. Input to PD-006.
+
+*Exit criteria* — supersede PD-002 if any holds; fallback is "borrow the spec
+and patterns, write our own engine":
+1. Baseline 0.7/0.8 fails in a way that cannot be fixed.
+2. G-01 (platform identity above tenants) cannot be built without changing
+   `/lip/v1` semantics.
+3. Task 5.2 fails, and neither vertical scaling nor completing task 2.7 fixes it.
+
+Date / approved by: 2026-11-06, project owner.
 
 ## PD-003 — Staff Scan is the trusted path — Proposed (recommended in brief)
 

@@ -34,7 +34,7 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
 
 | ID | Task | Closes | Depends on | Acceptance criteria | Done |
 | --- | --- | --- | --- | --- | --- |
-| 0.1 | Decide PD-002: adopt LIP as loyalty core (fork + pin 0.2.0) | — | — | PD-002 Approved or Superseded in 01-decisions.md | |
+| 0.1 | Decide PD-002: adopt LIP as loyalty core (fork + pin upstream `8ad93c8`) | — | — | PD-002 Approved or Superseded in 01-decisions.md | 2026-11-06 — Approved, conditional on 0.7 + 0.8 |
 | 0.2 | Decide PD-003: staff scan is the only path that grants value | — | — | PD-003 Approved | |
 | 0.3 | Decide PD-004: customer OTP provider + channel (SMS/WhatsApp) | G-06 | — | Provider chosen; confirmed it issues JWKS-verifiable JWTs; Egyptian delivery tested with one real number | |
 | 0.4 | Decide PD-006: hosting (Next.js on Vercel, LIP runtime on container host, Postgres provider) | — | 0.1 | Approved; region chosen; monthly cost estimate written | |
@@ -42,7 +42,7 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
 | 0.6 | New decision: purchase capture = bill amount only vs items | G-04 | 0.2 | Decision recorded with its effect on product exclusions | |
 | 0.7 | Baseline: `npm ci && npm run typecheck && npm test` on Node 22 | — | — | All green, result + Node version recorded here | |
 | 0.8 | Baseline: run Postgres profile + `lip doctor` + `lip test` | — | 0.7 | Conformance passes against Postgres runtime | |
-| 0.9 | Fix upstream AI-doc drift (`skills/lip/*`, old gap doc) or mark them non-authoritative | — | — | Skills no longer contradict code | |
+| 0.9 | Fix upstream AI-doc drift (`skills/lip/*`, old gap doc) or mark them non-authoritative; resolve `docs/postgres.md` "attached environment-specific disks" vs diskless `render.yaml` + release runbook | — | — | Skills and docs no longer contradict code | |
 | 0.10 | Legal pre-check: Egypt personal data law (151/2020), who is data controller (platform vs café) | — | — | Written note from counsel or explicit "deferred to Phase 5" decision | |
 
 **DoD:** PD-002/003/004/006/007 and 0.6 approved; baseline green; drift fixed.
@@ -62,6 +62,9 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
 
 ## Phase 2 — Foundation
 
+**Gate (PD-002):** tasks 0.7 and 0.8 must pass before Phase 2 starts or any
+application code is written.
+
 | ID | Task | Closes | Depends on | Acceptance criteria | Done |
 | --- | --- | --- | --- | --- | --- |
 | 2.1 | Rebrand: remove Crave/CraveUp names, ids (`crv_cus_*`), keep LICENSE/NOTICE | — | M1 | Grep finds no upstream brand in shipped code/UI | |
@@ -70,7 +73,7 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
 | 2.4 | Customer OTP auth integrated with BFF + OIDC verifier | G-06 | 0.3, 2.3 | Sign-in works end-to-end; tokens never reach LIP; rate limit on OTP requests | |
 | 2.5 | Cashier role: protocol write limited to accrue/redeem at own location; minimal customer view | G-05 | 2.2 | Permission tests: cashier cannot export, edit program, or act in other branch | |
 | 2.6 | Staff PIN login per branch device + device registration | G-05 | 2.5 | Lost device can be revoked by owner | |
-| 2.7 | Move platform state (profiles, events, segments, campaigns) from JSON blob to RLS tables | G-11 | 2.2 | No 100k event truncation; load test with 500 tenants × 10k customers | |
+| 2.7 | Move platform state (profiles, events, segments, campaigns) from JSON blob to RLS tables; make the platform layer multi-instance-safe | G-11 | 2.2 | Platform state lives in revisioned rows; no 100k event truncation; every scheduler (campaign, engagement, membership) and the webhook dispatcher run under `withLease()`; a test starts two instances and proves a due campaign runs exactly once; load test with 500 tenants × 10k customers | |
 | 2.8 | i18n + RTL infrastructure; localizable program/reward names | G-14 | 0.5 | Arabic and English render correctly; numbers/currency formatted for EGP | |
 | 2.9 | Audit log coverage for every staff/owner write | — | 2.5 | Every write has actor, branch, device, time | |
 

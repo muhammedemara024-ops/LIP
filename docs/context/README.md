@@ -17,6 +17,7 @@ repo root for Claude Code. Order of authority when files disagree:
 | `04-business-rules.md` | Invariants for loyalty, QR, transactions, messaging, tenancy |
 | `05-glossary.md` | Arabic/English terms used across the project |
 | `06-roadmap.md` | Phases, tasks, dependencies, acceptance criteria, milestones |
+| `07-fork-patches.md` | Log of every modification to upstream LIP code |
 | `claude-project-instructions.md` | Paste into the Claude Project "Instructions" box |
 
 Update rule: when a decision is made in chat, add it to `01-decisions.md` the
