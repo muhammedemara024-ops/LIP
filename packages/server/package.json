@@ -1,0 +1,49 @@
+{
+  "name": "@loyalty-interchange/server",
+  "version": "0.2.0",
+  "description": "HTTP reference binding for Loyalty Interchange Protocol.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/craveup-oss/loyalty-interchange-protocol.git",
+    "directory": "packages/server"
+  },
+  "homepage": "https://github.com/craveup-oss/loyalty-interchange-protocol#readme",
+  "bugs": {
+    "url": "https://github.com/craveup-oss/loyalty-interchange-protocol/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "sideEffects": false,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "lip-reference-server": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "prepack": "npm run build --workspace @loyalty-interchange/admin && npm run build"
+  },
+  "dependencies": {
+    "@loyalty-interchange/protocol": "0.2.0",
+    "@loyalty-interchange/reference": "0.2.0",
+    "@loyalty-interchange/storage-postgres": "0.2.0",
+    "@loyalty-interchange/storage-sqlite": "0.2.0",
+    "@sinclair/typebox": "^0.34.52"
+  }
+}

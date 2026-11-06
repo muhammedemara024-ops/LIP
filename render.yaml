@@ -1,0 +1,222 @@
+# Managed Crave Loyalty shared clusters
+#
+# Development, sandbox, and production are intentionally separate services with
+# separate secrets and independently managed Neon databases. Never reuse a Crave
+# application database or a `-pooler` endpoint: the runtime holds
+# session-scoped advisory leases, which a transaction pooler silently breaks.
+#
+# There is no disk. Every durable byte -- programs, members, balances, ledgers,
+# webhook state, access-control key hashes, credential handoffs -- is a row in
+# that environment's Neon database, so a container is disposable and the service
+# can run on Render Free after development certification. `LIP_CLOUD_PUBLIC_BASE_URL`
+# is what selects this mode;
+# the file-backed provisioner (`LIP_CLOUD_PROGRAM_DIR`) is for standalone Docker
+# and local development only, and setting both is refused at boot.
+#
+# `numInstances: 1` is a correctness constraint, not a cost decision: the
+# schedulers, webhook dispatch and credential single-flight assume one process.
+# Do not scale out before distributed leasing lands.
+#
+# Migrations run at startup under advisory locks. `preDeployCommand` repeats
+# them as defence in depth; the service does not depend on it. That is what
+# makes Render Free viable for development once no disk is attached -- Free has
+# no pre-deploy step. Development stays on `starter` until its certification
+# passes, then the plan is lowered deliberately rather than by blueprint.
+
+previews:
+  generation: off
+
+services:
+  - type: web
+    name: crave-loyalty-development
+    runtime: docker
+    branch: dev
+    region: oregon
+    plan: starter
+    numInstances: 1
+    autoDeploy: false
+    dockerfilePath: ./Dockerfile
+    dockerCommand: node apps/cloud/dist/cli.js
+    preDeployCommand: node apps/cloud/dist/migrate-cli.js
+    healthCheckPath: /ready
+    envVars:
+      - key: LIP_CLOUD_DEPLOYMENT_ENVIRONMENT
+        value: development
+      - key: LIP_CLOUD_DATABASE_URL
+        sync: false # direct development Neon URL; never a Crave DB or pooler
+      - key: LIP_CLOUD_PUBLIC_BASE_URL
+        sync: false # this service\'s exact public origin; selects the diskless managed runtime
+      - key: LIP_CLOUD_API_KEY
+        sync: false # bootstrap only; retire after the first operator exists
+      - key: LIP_CLOUD_CREDENTIAL_KEY
+        sync: false # 32-byte unpadded base64url AES-256-GCM key
+      - key: LIP_CLOUD_ALLOWED_ORIGINS
+        sync: false
+      - key: LIP_CLOUD_SHARED_KEY_DISABLED
+        sync: false # set false only for first-operator bootstrap, then permanently true
+      - key: LIP_CLOUD_HOST
+        value: 0.0.0.0
+      - key: LIP_CLOUD_PORT
+        value: "10000"
+      - key: HEALTH_PORT
+        value: "10000"
+      - key: LIP_CLOUD_REGIONS
+        value: render-oregon
+      - key: LIP_CLOUD_DEFAULT_PLAN
+        value: free
+      # Optional production-equivalent auth/billing/customer integrations.
+      - key: LIP_CLOUD_OIDC_ISSUER
+        sync: false
+      - key: LIP_CLOUD_OIDC_AUDIENCE
+        sync: false
+      - key: LIP_CLOUD_OIDC_JWKS_URI
+        sync: false
+      - key: LIP_CLOUD_BOOTSTRAP_SUBJECTS
+        sync: false
+      - key: LIP_CLOUD_STRIPE_SECRET_KEY
+        sync: false
+      - key: LIP_CLOUD_STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: LIP_CLOUD_STRIPE_PRICE_PRO
+        sync: false
+      - key: LIP_CLOUD_STRIPE_PRICE_BUSINESS
+        sync: false
+      - key: LIP_CLOUD_CUSTOMER_OIDC_ISSUER
+        sync: false
+      - key: LIP_CLOUD_CUSTOMER_OIDC_AUDIENCE
+        sync: false
+      - key: LIP_CLOUD_CUSTOMER_AUTHORIZED_PARTIES
+        sync: false
+      - key: LIP_CLOUD_CUSTOMER_TENANT_ID
+        sync: false
+      - key: LIP_CLOUD_CUSTOMER_PROVIDER_ID
+        sync: false
+
+  - type: web
+    name: crave-loyalty-sandbox
+    runtime: docker
+    branch: sandbox
+    region: oregon
+    plan: starter
+    numInstances: 1
+    autoDeploy: false
+    dockerfilePath: ./Dockerfile
+    dockerCommand: node apps/cloud/dist/cli.js
+    preDeployCommand: node apps/cloud/dist/migrate-cli.js
+    healthCheckPath: /ready
+    envVars:
+      - key: LIP_CLOUD_DEPLOYMENT_ENVIRONMENT
+        value: sandbox
+      - key: LIP_CLOUD_DATABASE_URL
+        sync: false # direct sandbox Neon URL; never a Crave DB or pooler
+      - key: LIP_CLOUD_PUBLIC_BASE_URL
+        sync: false # this service\'s exact public origin; selects the diskless managed runtime
+      - key: LIP_CLOUD_API_KEY
+        sync: false # bootstrap only; retire after the first operator exists
+      - key: LIP_CLOUD_CREDENTIAL_KEY
+        sync: false # 32-byte unpadded base64url AES-256-GCM key
+      - key: LIP_CLOUD_ALLOWED_ORIGINS
+        sync: false
+      - key: LIP_CLOUD_SHARED_KEY_DISABLED
+        sync: false # set false only for first-operator bootstrap, then permanently true
+      - key: LIP_CLOUD_HOST
+        value: 0.0.0.0
+      - key: LIP_CLOUD_PORT
+        value: "10000"
+      - key: HEALTH_PORT
+        value: "10000"
+      - key: LIP_CLOUD_REGIONS
+        value: render-oregon
+      - key: LIP_CLOUD_DEFAULT_PLAN
+        value: free
+      # Optional production-equivalent auth/billing/customer integrations.
+      - key: LIP_CLOUD_OIDC_ISSUER
+        sync: false
+      - key: LIP_CLOUD_OIDC_AUDIENCE
+        sync: false
+      - key: LIP_CLOUD_OIDC_JWKS_URI
+        sync: false
+      - key: LIP_CLOUD_BOOTSTRAP_SUBJECTS
+        sync: false
+      - key: LIP_CLOUD_STRIPE_SECRET_KEY
+        sync: false
+      - key: LIP_CLOUD_STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: LIP_CLOUD_STRIPE_PRICE_PRO
+        sync: false
+      - key: LIP_CLOUD_STRIPE_PRICE_BUSINESS
+        sync: false
+      - key: LIP_CLOUD_CUSTOMER_OIDC_ISSUER
+        sync: false
+      - key: LIP_CLOUD_CUSTOMER_OIDC_AUDIENCE
+        sync: false
+      - key: LIP_CLOUD_CUSTOMER_AUTHORIZED_PARTIES
+        sync: false
+      - key: LIP_CLOUD_CUSTOMER_TENANT_ID
+        sync: false
+      - key: LIP_CLOUD_CUSTOMER_PROVIDER_ID
+        sync: false
+
+  - type: web
+    name: crave-loyalty-production
+    runtime: docker
+    branch: main
+    region: oregon
+    plan: starter
+    numInstances: 1
+    autoDeploy: false
+    dockerfilePath: ./Dockerfile
+    dockerCommand: node apps/cloud/dist/cli.js
+    preDeployCommand: node apps/cloud/dist/migrate-cli.js
+    healthCheckPath: /ready
+    envVars:
+      - key: LIP_CLOUD_DEPLOYMENT_ENVIRONMENT
+        value: production
+      - key: LIP_CLOUD_DATABASE_URL
+        sync: false # direct production Neon URL; never a Crave DB or pooler
+      - key: LIP_CLOUD_PUBLIC_BASE_URL
+        sync: false # this service\'s exact public origin; selects the diskless managed runtime
+      - key: LIP_CLOUD_API_KEY
+        sync: false # bootstrap only; retire after the first operator exists
+      - key: LIP_CLOUD_CREDENTIAL_KEY
+        sync: false # independent production encryption key
+      - key: LIP_CLOUD_ALLOWED_ORIGINS
+        sync: false
+      - key: LIP_CLOUD_SHARED_KEY_DISABLED
+        sync: false # set false only for first-operator bootstrap, then permanently true
+      - key: LIP_CLOUD_HOST
+        value: 0.0.0.0
+      - key: LIP_CLOUD_PORT
+        value: "10000"
+      - key: HEALTH_PORT
+        value: "10000"
+      - key: LIP_CLOUD_REGIONS
+        value: render-oregon
+      - key: LIP_CLOUD_DEFAULT_PLAN
+        value: free
+      - key: LIP_CLOUD_OIDC_ISSUER
+        sync: false
+      - key: LIP_CLOUD_OIDC_AUDIENCE
+        sync: false
+      - key: LIP_CLOUD_OIDC_JWKS_URI
+        sync: false
+      - key: LIP_CLOUD_BOOTSTRAP_SUBJECTS
+        sync: false
+      - key: LIP_CLOUD_STRIPE_SECRET_KEY
+        sync: false
+      - key: LIP_CLOUD_STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: LIP_CLOUD_STRIPE_PRICE_PRO
+        sync: false
+      - key: LIP_CLOUD_STRIPE_PRICE_BUSINESS
+        sync: false
+      - key: LIP_CLOUD_CUSTOMER_OIDC_ISSUER
+        sync: false
+      - key: LIP_CLOUD_CUSTOMER_OIDC_AUDIENCE
+        sync: false
+      - key: LIP_CLOUD_CUSTOMER_AUTHORIZED_PARTIES
+        sync: false
+      - key: LIP_CLOUD_CUSTOMER_TENANT_ID
+        sync: false
+      - key: LIP_CLOUD_CUSTOMER_PROVIDER_ID
+        sync: false

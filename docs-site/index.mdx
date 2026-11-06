@@ -1,0 +1,86 @@
+---
+title: "Loyalty Interchange Protocol"
+sidebarTitle: "Home"
+description: "Open, vendor-neutral loyalty infrastructure for restaurant, QSR, coffee, convenience, and franchise ordering systems"
+icon: "house"
+---
+
+**LIP is an open-source loyalty platform and vendor-neutral transaction protocol for restaurant technology teams.** It combines customer data, a marketer workspace, campaigns and attribution, a reference guest wallet, restaurant adapters, and a deterministic checkout engine. Self-host the Apache-2.0 stack or adopt only the portable `/lip/v1` contract.
+
+<CardGroup cols={3}>
+  <Card title="Try in the browser" icon="play" href="https://opensource-loyalty.vercel.app/#walkthrough">
+    Run evaluate through refund against synthetic foodservice data. No key or install.
+  </Card>
+  <Card title="Self-host" icon="server" href="/get-started/quickstart">
+    Start the Apache-2.0 reference platform with Docker or Node 22.
+  </Card>
+  <Card title="Design partner" icon="handshake" href="/about/design-partners">
+    Prove one real ordering integration, migration, and rollback path.
+  </Card>
+</CardGroup>
+
+## Quick start
+
+<Tabs>
+  <Tab title="Docker">
+    ```bash
+    git clone https://github.com/craveup-oss/loyalty-interchange-protocol.git
+    cd opensource-loyalty
+    docker compose up --build
+    ```
+
+    Then open [Admin](http://127.0.0.1:3210/admin/) with the printed key (`lip-local-compose-key-change-me` in the local-only Compose profile) and the visibly synthetic [guest wallet](http://127.0.0.1:3230/).
+  </Tab>
+  <Tab title="Source">
+    Requires Node.js 22 or newer and npm.
+
+    ```bash
+    git clone https://github.com/craveup-oss/loyalty-interchange-protocol.git
+    cd opensource-loyalty
+    npm install
+    npm start
+    ```
+
+    The CLI prints the Admin URL and the Admin/API key. Open the URL and sign in.
+  </Tab>
+</Tabs>
+
+<Note>
+Installed and running? Read [Essentials](/get-started/essentials) next — it covers the six things every new integrator needs: the order lifecycle, idempotency, the Admin dashboard, the CLI, reset and seed controls, and conformance checks.
+</Note>
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/get-started/quickstart">
+    From clean clone to a working loyalty request in five minutes.
+  </Card>
+  <Card title="TypeScript SDK" icon="code" href="/guides/typescript-sdk">
+    The idiomatic client: typed errors, exact money, and the order builder.
+  </Card>
+  <Card title="API Reference" icon="terminal" href="/api-reference/overview">
+    Every endpoint, generated from the checked-in OpenAPI 3.1 contract.
+  </Card>
+  <Card title="Webhooks" icon="bolt" href="/guides/webhooks">
+    Signed CloudEvents after every successful mutation.
+  </Card>
+  <Card title="Reference Platform" icon="server" href="/guides/reference-platform">
+    Server, Admin dashboard, storage, and implementation boundaries.
+  </Card>
+  <Card title="Platform API" icon="users" href="/guides/platform-api">
+    Profiles, consent, events, segments, campaigns, imports, and attribution.
+  </Card>
+  <Card title="Guest Wallet" icon="wallet" href="/guides/wallet">
+    A responsive OIDC Authorization Code + PKCE reference BFF.
+  </Card>
+  <Card title="Protocol Spec" icon="book" href="/protocol/overview">
+    The normative contract: lifecycle rules, profiles, and conformance.
+  </Card>
+</CardGroup>
+
+## What the protocol covers
+
+- **Complete loyalty lifecycle** — member lookup, enrollment, balances, ledger history, order evaluation before checkout, accrual after payment, and redemption reserve, capture, reverse, and refund-safe adjustment flows.
+- **Foodservice-first order model** — items, modifiers, discounts, fees, taxes, tips, tenders, and totals, with channel-aware rules for counter, drive-thru, kiosk, web, mobile, pickup, delivery, and catering.
+- **Retry-safe by design** — idempotency keys, request context, RFC 9457 problem details, and partial refund, void, reversal, and duplicate-check semantics.
+- **Multiple program models** — executable points, visits and stamps, wallet credit, paid membership, and hybrid multi-account programs.

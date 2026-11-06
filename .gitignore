@@ -1,0 +1,54 @@
+node_modules/
+dist/
+coverage/
+.playwright-cli/
+.DS_Store
+Icon?
+*.log
+.env
+.env.*
+!.env.example
+
+# Local credentials, certificates, and signing material
+*.secret
+*.secrets
+*.credentials
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.cer
+*.crt
+*.der
+**/credentials.json
+**/secrets.json
+.npmrc
+
+# Local databases and personal state
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.tfstate
+*.tfstate.*
+
+# Build tools and local caches
+.cache/
+.turbo/
+.vite/
+.next/
+*.tsbuildinfo
+.lip/
+.agents/
+.cursor/
+skills-lock.json
+packages/mcp/assets/
+
+# Local security reports (gstack /cso)
+.gstack/
+
+# Git worktrees (isolated feature branches)
+.worktrees/

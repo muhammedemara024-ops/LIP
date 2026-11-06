@@ -1,0 +1,423 @@
+import {
+  SignJWT,
+  createLocalJWKSet,
+  exportJWK,
+  generateKeyPair
+} from "jose";
+import { describe, expect, it, vi } from "vitest";
+import type { LipClient } from "@loyalty-interchange/sdk";
+import {
+  CustomerIdentityError,
+  CustomerLoyaltyResolver,
+  LIP_CUSTOMER_IDENTITY_ISSUER,
+  MemoryCustomerDirectoryRepository,
+  OidcTokenVerifier,
+  bearerToken,
+  cancelLipMember,
+  type IdentityProviderPrincipal
+} from "./index.js";
+
+const NOW = "2026-07-17T02:00:00.000Z";
+
+function principal(
+  subject: string,
+  issuer = "https://identity.example.com"
+): IdentityProviderPrincipal {
+  return {
+    issuer,
+    subject,
+    email: `${subject}@example.com`,
+    emailVerified: true,
+    claims: {}
+  };
+}
+
+function lipFixture(memberId = "member-001") {
+  const enroll = vi.fn(async (_input: unknown, _options?: unknown) => ({
+    context: {
+      protocol_version: "1.0" as const,
+      profile: "foodservice/1.0" as const,
+      request_id: "request-001",
+      idempotency_key: "idempotency-001",
+      occurred_at: NOW,
+      source: { system: "test" },
+      provider: { system: "test" }
+    },
+    member: {
+      member_id: memberId,
+      program_id: "acme-rewards",
+      status: "active" as const,
+      joined_at: NOW,
+      identities: [
+        {
+          type: "external" as const,
+          issuer: LIP_CUSTOMER_IDENTITY_ISSUER,
+          value: "customer-001"
+        }
+      ]
+    },
+    balances: []
+  }));
+  return {
+    enroll,
+    lip: {
+      members: {
+        enroll,
+        lookup: vi.fn()
+      }
+    } as unknown as Pick<LipClient, "members">
+  };
+}
+
+async function signedToken(input: {
+  issuer?: string;
+  audience?: string;
+  subject?: string;
+  azp?: string;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
+}) {
+  const { publicKey, privateKey } = await generateKeyPair("RS256");
+  const jwk = await exportJWK(publicKey);
+  const key = createLocalJWKSet({ keys: [{ ...jwk, kid: "test-key", alg: "RS256" }] });
+  const token = await new SignJWT({
+    email: "Customer@Example.com",
+    email_verified: input.emailVerified ?? true,
+    phone_number: "+15555550123",
+    phone_number_verified: input.phoneVerified ?? true,
+    ...(input.azp ? { azp: input.azp } : {})
+  })
+    .setProtectedHeader({ alg: "RS256", kid: "test-key" })
+    .setIssuer(input.issuer ?? "https://identity.example.com")
+    .setAudience(input.audience ?? "acme-bff")
+    .setSubject(input.subject ?? "user_123")
+    .setIssuedAt()
+    .setExpirationTime("5m")
+    .sign(privateKey);
+  return { key, token };
+}
+
+describe("OIDC token verifier", () => {
+  it("validates a token and exposes only verified contact claims", async () => {
+    const { key, token } = await signedToken({});
+    const verifier = new OidcTokenVerifier({
+      issuer: "https://identity.example.com/",
+      audience: "acme-bff",
+      key
+    });
+
+    await expect(verifier.verifyAuthorization(`Bearer ${token}`)).resolves.toMatchObject({
+      issuer: "https://identity.example.com",
+      subject: "user_123",
+      email: "customer@example.com",
+      emailVerified: true,
+      phoneNumber: "+15555550123",
+      phoneNumberVerified: true
+    });
+  });
+
+  it("rejects the wrong audience and unauthorized Clerk-style azp", async () => {
+    const { key, token } = await signedToken({ audience: "another-api", azp: "https://bad.app" });
+    const verifier = new OidcTokenVerifier({
+      issuer: "https://identity.example.com",
+      audience: "acme-bff",
+      authorizedParties: ["https://acme.app"],
+      key
+    });
+
+    await expect(verifier.verifyToken(token)).rejects.toMatchObject({
+      code: "invalid_token"
+    });
+  });
+
+  it("accepts an allowed authorized party", async () => {
+    const { key, token } = await signedToken({ azp: "https://acme.app" });
+    const verifier = new OidcTokenVerifier({
+      issuer: "https://identity.example.com",
+      audience: "acme-bff",
+      authorizedParties: ["https://acme.app"],
+      key
+    });
+
+    await expect(verifier.verifyToken(token)).resolves.toMatchObject({
+      subject: "user_123"
+    });
+  });
+
+  it("does not expose unverified email or phone claims", async () => {
+    const { key, token } = await signedToken({
+      emailVerified: false,
+      phoneVerified: false
+    });
+    const verifier = new OidcTokenVerifier({
+      issuer: "https://identity.example.com",
+      audience: "acme-bff",
+      key
+    });
+
+    const verified = await verifier.verifyToken(token);
+    expect(verified.email).toBeUndefined();
+    expect(verified.phoneNumber).toBeUndefined();
+  });
+
+  it("validates configuration and bearer syntax", () => {
+    expect(
+      () => new OidcTokenVerifier({ issuer: "", audience: "api", key: vi.fn() })
+    ).toThrowError(CustomerIdentityError);
+    expect(
+      () =>
+        new OidcTokenVerifier({
+          issuer: "https://identity.example.com",
+          audience: [],
+          key: vi.fn()
+        })
+    ).toThrowError(/audience/i);
+    expect(() => bearerToken()).toThrowError(/Bearer/);
+    expect(() => bearerToken("Bearer   ")).toThrowError(/empty/);
+  });
+});
+
+describe("customer-to-member resolution", () => {
+  it("creates one stable customer and one program member", async () => {
+    const repository = new MemoryCustomerDirectoryRepository();
+    const { lip, enroll } = lipFixture();
+    const resolver = new CustomerLoyaltyResolver({
+      repository,
+      lip,
+      clock: () => new Date(NOW),
+      customerId: () => "customer-001"
+    });
+
+    const first = await resolver.resolve({
+      tenantId: "acme",
+      programId: "acme-rewards",
+      principal: principal("clerk-user")
+    });
+    const second = await resolver.resolve({
+      tenantId: "acme",
+      programId: "acme-rewards",
+      principal: principal("clerk-user")
+    });
+
+    expect(second).toEqual(first);
+    expect(first.memberLink.memberId).toBe("member-001");
+    expect(enroll).toHaveBeenCalledTimes(1);
+    expect(enroll.mock.calls[0]?.[0]).toEqual({
+      program_id: "acme-rewards",
+      identity: {
+        type: "external",
+        issuer: LIP_CUSTOMER_IDENTITY_ISSUER,
+        value: "customer-001"
+      }
+    });
+    expect(JSON.stringify(enroll.mock.calls[0])).not.toContain("clerk-user");
+    expect(JSON.stringify(enroll.mock.calls[0])).not.toContain("@example.com");
+  });
+
+  it("isolates the same provider subject by tenant", async () => {
+    const repository = new MemoryCustomerDirectoryRepository();
+    const firstLip = lipFixture("member-acme");
+    const secondLip = lipFixture("member-another");
+    let sequence = 0;
+    const ids = () => `customer-00${++sequence}`;
+    const acme = new CustomerLoyaltyResolver({
+      repository,
+      lip: firstLip.lip,
+      clock: () => new Date(NOW),
+      customerId: ids
+    });
+    const another = new CustomerLoyaltyResolver({
+      repository,
+      lip: secondLip.lip,
+      clock: () => new Date(NOW),
+      customerId: ids
+    });
+
+    const first = await acme.resolve({
+      tenantId: "acme",
+      programId: "acme-rewards",
+      principal: principal("shared-subject")
+    });
+    const second = await another.resolve({
+      tenantId: "another-brand",
+      programId: "another-rewards",
+      principal: principal("shared-subject")
+    });
+
+    expect(first.customer.customerId).not.toBe(second.customer.customerId);
+  });
+
+  it("links another external identity without changing customer id", async () => {
+    const repository = new MemoryCustomerDirectoryRepository();
+    const { lip } = lipFixture();
+    const resolver = new CustomerLoyaltyResolver({
+      repository,
+      lip,
+      clock: () => new Date(NOW),
+      customerId: () => "customer-001"
+    });
+    const resolved = await resolver.resolve({
+      tenantId: "acme",
+      programId: "acme-rewards",
+      principal: principal("clerk-user", "https://clerk.example.com")
+    });
+
+    await resolver.linkIdentity({
+      tenantId: "acme",
+      customerId: resolved.customer.customerId,
+      principal: principal("auth0-user", "https://auth0.example.com")
+    });
+
+    await expect(
+      repository.customerForIdentity(
+        "acme",
+        "https://auth0.example.com",
+        "auth0-user"
+      )
+    ).resolves.toMatchObject({ customerId: "customer-001" });
+  });
+
+  it("retains identity linkage while preventing deleted customers from resolving", async () => {
+    const repository = new MemoryCustomerDirectoryRepository();
+    const { lip } = lipFixture();
+    const cancelMember = vi.fn(async () => undefined);
+    const resolver = new CustomerLoyaltyResolver({
+      repository,
+      lip,
+      cancelMember,
+      clock: () => new Date(NOW),
+      customerId: () => "customer-001"
+    });
+    await resolver.resolve({
+      tenantId: "acme",
+      programId: "acme-rewards",
+      principal: principal("clerk-user")
+    });
+    await resolver.deleteCustomer("acme", "customer-001");
+
+    expect(cancelMember).toHaveBeenCalledWith("member-001");
+    await expect(
+      resolver.resolve({
+        tenantId: "acme",
+        programId: "acme-rewards",
+        principal: principal("clerk-user")
+      })
+    ).rejects.toMatchObject({ code: "customer_deleted" });
+  });
+
+  it("cancels LIP members through the admin API helper", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ member: { member_id: "member-001", status: "closed" } }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      })
+    );
+    await expect(
+      cancelLipMember({
+        baseUrl: "https://lip.example/",
+        apiKey: "admin-key-value",
+        memberId: "member-001",
+        fetch: fetchMock as unknown as typeof fetch
+      })
+    ).resolves.toEqual({ member_id: "member-001", status: "closed" });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://lip.example/admin/api/v1/members/cancel",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          authorization: "Bearer admin-key-value"
+        }),
+        body: JSON.stringify({ member_id: "member-001" })
+      })
+    );
+
+    await expect(
+      cancelLipMember({
+        baseUrl: "https://lip.example",
+        apiKey: "admin-key-value",
+        memberId: "missing",
+        fetch: vi.fn(async () =>
+          new Response(JSON.stringify({ detail: "Member missing was not found" }), {
+            status: 404,
+            headers: { "content-type": "application/json" }
+          })
+        ) as unknown as typeof fetch
+      })
+    ).rejects.toThrow(/Member missing was not found/);
+
+    await expect(
+      cancelLipMember({
+        baseUrl: "https://lip.example",
+        apiKey: "admin-key-value",
+        memberId: "member-002",
+        fetch: vi.fn(async () =>
+          new Response(JSON.stringify({ title: "Conflict" }), {
+            status: 409,
+            headers: { "content-type": "application/json" }
+          })
+        ) as unknown as typeof fetch
+      })
+    ).rejects.toThrow(/Conflict/);
+
+    await expect(
+      cancelLipMember({
+        baseUrl: "https://lip.example",
+        apiKey: "admin-key-value",
+        memberId: "member-003",
+        fetch: vi.fn(async () =>
+          new Response(JSON.stringify({ member: {} }), {
+            status: 200,
+            headers: { "content-type": "application/json" }
+          })
+        ) as unknown as typeof fetch
+      })
+    ).resolves.toEqual({ member_id: "member-003", status: "closed" });
+  });
+
+  it("rejects conflicting identity and member links", async () => {
+    const repository = new MemoryCustomerDirectoryRepository();
+    await repository.resolveOrCreateCustomer({
+      tenantId: "acme",
+      principal: principal("first"),
+      customerId: "customer-first",
+      now: NOW
+    });
+    await repository.resolveOrCreateCustomer({
+      tenantId: "acme",
+      principal: principal("second"),
+      customerId: "customer-second",
+      now: NOW
+    });
+    await repository.linkExternalIdentity({
+      tenantId: "acme",
+      customerId: "customer-first",
+      principal: principal("shared"),
+      now: NOW
+    });
+    await expect(
+      repository.linkExternalIdentity({
+        tenantId: "acme",
+        customerId: "customer-second",
+        principal: principal("shared"),
+        now: NOW
+      })
+    ).rejects.toMatchObject({ code: "identity_conflict" });
+
+    await repository.linkMember({
+      tenantId: "acme",
+      customerId: "customer-first",
+      programId: "acme-rewards",
+      memberId: "member-first",
+      now: NOW
+    });
+    await expect(
+      repository.linkMember({
+        tenantId: "acme",
+        customerId: "customer-first",
+        programId: "acme-rewards",
+        memberId: "member-second",
+        now: NOW
+      })
+    ).rejects.toMatchObject({ code: "member_conflict" });
+  });
+});

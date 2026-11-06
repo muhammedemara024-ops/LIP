@@ -1,0 +1,21 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/adapter-kit" },
+    { "path": "./packages/identity" },
+    { "path": "./apps/cloud" },
+    { "path": "./apps/wallet" },
+    { "path": "./packages/protocol" },
+    { "path": "./packages/reference" },
+    { "path": "./packages/storage" },
+    { "path": "./packages/storage-sqlite" },
+    { "path": "./packages/storage-postgres" },
+    { "path": "./packages/server" },
+    { "path": "./packages/cli" },
+    { "path": "./packages/mcp" },
+    { "path": "./packages/sdk" },
+    { "path": "./scripts" },
+    { "path": "./examples" },
+    { "path": "./tests" }
+  ]
+}

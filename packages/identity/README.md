@@ -1,0 +1,23 @@
+# @loyalty-interchange/identity
+
+OIDC token verification and stable customer-to-loyalty-member mapping for Loyalty Interchange.
+
+Part of the [Loyalty Interchange Protocol (LIP)](https://github.com/craveup-oss/loyalty-interchange-protocol)
+— an open, vendor-neutral loyalty protocol and reference platform for
+restaurant, QSR, coffee, and franchise ordering systems.
+
+## Install
+
+```bash
+npm install @loyalty-interchange/identity
+```
+
+## Documentation
+
+- Docs site: https://loyalty-interchange.mintlify.app
+- Source and issues: https://github.com/craveup-oss/loyalty-interchange-protocol
+- npm scope: https://www.npmjs.com/org/loyalty-interchange
+
+## License
+
+[Apache-2.0](./LICENSE)

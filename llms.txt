@@ -1,0 +1,176 @@
+# Loyalty Interchange Protocol (LIP)
+# Compact index for AI coding agents. When docs and spec disagree, spec/ wins.
+
+> LIP is an open-source restaurant loyalty platform with a separate,
+> vendor-neutral transaction protocol. `/platform/v1` handles customer data,
+> segments, campaigns, and analytics; `/lip/v1` stays portable. It is NOT a
+> customer auth provider — apps use a BFF that holds merchant credentials and
+> maps users to member_id.
+
+## Quick commands
+
+npm install && npm start
+npm run lip -- doctor http://127.0.0.1:3210 --api-key lip-dev-key
+npm run lip -- test http://127.0.0.1:3210 --api-key lip-dev-key
+npm run example:sdk
+npm run example:bff
+npm run test
+
+## Agent setup
+
+npx skills add .
+npm run mcp          # official MCP server (stdio)
+mcp.json             # Cursor MCP config
+
+Agent docs:
+- docs/using-lip-with-ai.md
+- docs/ai-prompts.md
+- skills/README.md
+
+## Agent docs
+
+- docs/using-lip-with-ai.md — start here for LLM-assisted development
+- docs/ai-prompts.md — copy/paste prompts for common integration tasks
+- docs/getting-started.md — shortest path to a working request
+- docs/typescript-sdk.md — LipClient, idempotency, webhooks, order builder
+- docs/api-endpoints.md — HTTP operations and curl examples
+- docs/webhook-delivery.md — signed CloudEvents and receiver setup
+- docs/reference-platform.md — server, Admin, SQLite sandbox
+- docs/ordering-adapters.md — source mapping + adapter certification
+- docs/member-migration.md — checksummed member/balance planning
+- docs/security-and-operations.md — boundaries, recovery, production gates
+- llms-full.txt — expanded product, integration, and operations map
+
+## Normative spec (read before changing behavior)
+
+- spec/lifecycle.md — enroll, evaluate, accrue, reserve, capture, reverse, adjust
+- spec/core.md — protocol context, idempotency, problem details
+- spec/profiles/foodservice.md — FoodserviceOrder, earning exclusions, channels
+- spec/webhooks.md — HMAC-SHA256 signature profile, deduplication
+- spec/openapi.yaml — generated HTTP binding (18 operations)
+- spec/schemas/ — JSON Schema Draft 2020-12 payloads
+
+## Runnable examples
+
+- examples/typescript/full-lifecycle.ts — enroll → evaluate → accrue → reserve → capture → reverse → adjust
+- examples/typescript/ordering-bff.ts — merchant-key-safe checkout orchestration
+
+## SDK (prefer over raw fetch)
+
+import { LipClient } from "@loyalty-interchange/sdk"
+
+Operations:
+  lip.members.enroll / lookup
+  lip.orders.evaluate / adjust
+  lip.accruals.post
+  lip.redemptions.reserve / capture / reverse
+  lip.accounts.get / lip.ledger.list / lip.ledger.adjust / lip.programs.get
+  lip.issuedRewards.list / issue / cancel
+
+Idempotency: derive keys from business ids (order_id), not random UUIDs per retry.
+  lip.accruals.post(body, { idempotencyKey: `accrual:${order.order_id}` })
+
+Webhooks: verifyWebhook(payload, secret, timestamp, signature) before JSON.parse
+
+## HTTP API (Bearer merchant key)
+
+POST /lip/v1/members/enroll
+POST /lip/v1/members/lookup
+POST /lip/v1/orders/evaluate
+POST /lip/v1/accruals
+POST /lip/v1/redemptions/reserve
+POST /lip/v1/redemptions/capture
+POST /lip/v1/redemptions/reverse
+POST /lip/v1/orders/adjust
+POST /lip/v1/accounts/get
+POST /lip/v1/ledger/list
+POST /lip/v1/ledger/manual-adjustments
+POST /lip/v1/programs/get
+POST /lip/v1/issued-rewards/list
+POST /lip/v1/issued-rewards/issue
+POST /lip/v1/issued-rewards/cancel
+
+Discovery: GET /.well-known/lip, GET /health
+Operations: GET /metrics (Bearer auth), RateLimit-* headers, JSON request logs
+Admin: http://127.0.0.1:3210/admin/ (same key as API)
+Platform API: http://127.0.0.1:3210/platform/v1 (same Bearer auth)
+Synthetic guest wallet: http://127.0.0.1:3230/
+
+## Reference product API (non-normative)
+
+`/platform/v1` provides profiles and consent, behavioral events, bounded
+member CSV imports, dynamic/static segments, segment preview, reward campaigns,
+deterministic holdouts, attribution, redacted connectors, and analytics.
+Reference: docs/platform-api.md and spec/platform-openapi.yaml.
+
+This product API is not covered by LIP protocol conformance and must never be
+added to spec/openapi.yaml. Location-scoped credentials fail closed because
+the current platform API reads tenant-wide customer data.
+
+## Checkout lifecycle (foodservice)
+
+1. orders/evaluate — preview earn + redeem eligibility (before payment)
+2. redemptions/reserve — hold points for a reward (optional)
+3. [payment provider]
+4. accruals — post earned points
+5. redemptions/capture — finalize redemption (if reserved)
+On failure after reserve: redemptions/reverse
+On refund: redemptions/reverse (if redeemed) + orders/adjust (claw back earn)
+
+## Webhook events (reference platform)
+
+org.loyalty-interchange.member.enrolled.v1
+org.loyalty-interchange.order.accrued.v1
+org.loyalty-interchange.order.adjusted.v1
+org.loyalty-interchange.redemption.reserved.v1
+org.loyalty-interchange.redemption.captured.v1
+org.loyalty-interchange.redemption.reversed.v1
+org.loyalty-interchange.issued-reward.issued.v1
+org.loyalty-interchange.issued-reward.redeemed.v1
+org.loyalty-interchange.issued-reward.restored.v1
+org.loyalty-interchange.issued-reward.cancelled.v1
+
+Enable: LIP_WEBHOOK_URL + LIP_WEBHOOK_SECRET env vars on lip serve
+Failed deliveries persist in the SQLite outbox and resume after restart.
+
+## Implementation map (change behavior here)
+
+- packages/protocol/src — schema source, generated types
+- packages/adapter-kit/src — ordering adapter contract and certification runner
+- packages/reference/src/engine.ts — loyalty engine rules
+- packages/server/src/server.ts — HTTP routes
+- packages/server/src/customer-data.ts — profiles, consent, events, imports, attribution
+- packages/server/src/telemetry.ts — optional disabled-by-default self-host heartbeat
+- packages/adapter-kit/src/square.ts — Square mapping + raw-body signature verification
+- packages/server/src/program-management.ts — non-normative draft/publish/rollback
+- packages/sdk/src/client.ts — idiomatic TypeScript client
+- packages/identity/src — external OIDC validation + stable customer/member mapping
+- packages/cli/src/cli.ts — lip CLI (serve, doctor, test, validate)
+- apps/admin/src/App.tsx — reference Admin dashboard
+- apps/wallet/src — OIDC Authorization Code + PKCE reference wallet BFF
+
+## BFF integration pattern (customer apps)
+
+App uses Clerk/Auth0/OIDC and holds that provider's session token only. BFF
+validates it, maps `{tenant_id, issuer, subject}` to a stable customer/member,
+and holds LIP_API_KEY. BFF calls evaluate for cart preview and runs
+reserve→pay→accrue→capture. `@loyalty-interchange/identity` supplies the thin
+server-side verifier and mapping contract; it does not own sign-in or sessions.
+Reference: docs/customer-identity.md (BFF integration pattern and mapping contract).
+
+## Not in the normative LIP protocol
+
+- Customer auth (OTP, social, sessions)
+- Hosted sign-up/sign-in UI and customer session issuance
+- Universal vendor-certified adapters (mappings require source fixtures)
+- Customer profiles, imports, segments, campaigns, connectors, and attribution
+  (the reference product exposes these at non-normative `/platform/v1`)
+- Portable program-authoring APIs (the Admin has non-normative draft/publish)
+- Live loyalty operations over MCP (official MCP supplies docs, schemas, and validation only)
+
+## Maintainer
+
+PLAN.md — roadmap
+CONTRIBUTING.md — conformance and compatibility rules
+npm run generate — regen OpenAPI + schemas from protocol source
+npm run verify — typecheck + unit tests

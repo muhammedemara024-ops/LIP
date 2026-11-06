@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Open-source restaurant loyalty platform | LIP</title>
+  <meta name="description" content="Self-host restaurant loyalty with a marketer workspace, guest wallet, customer data API, campaigns, Square adapter, and an open checkout protocol." />
+  <meta name="posthog-key" content="" />
+  <meta name="posthog-host" content="https://us.i.posthog.com" />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <link rel="canonical" href="https://opensource-loyalty.vercel.app/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="The open-source loyalty platform for restaurant technology teams" />
+  <meta property="og:description" content="Own the marketer workflow, guest wallet, customer data, campaigns, and checkout lifecycle in one Apache-2.0 stack." />
+  <meta property="og:url" content="https://opensource-loyalty.vercel.app/" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="theme-color" content="#08110b" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Loyalty Interchange Protocol",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Linux, macOS, Windows",
+    "url": "https://opensource-loyalty.vercel.app/",
+    "downloadUrl": "https://www.npmjs.com/org/loyalty-interchange",
+    "codeRepository": "https://github.com/craveup-oss/loyalty-interchange-protocol",
+    "license": "https://www.apache.org/licenses/LICENSE-2.0",
+    "softwareVersion": "0.2.0",
+    "description": "Open-source restaurant loyalty platform with a marketer workspace, guest wallet BFF, customer data API, campaigns, adapters, and a vendor-neutral transaction protocol."
+  }
+  </script>
+  <style>
+    :root {
+      --bg: #08110b; --surface: #0e1811; --surface-2: #132018;
+      --border: #223327; --text: #ecf6ee; --dim: #a2b5a6;
+      --green: #52e184; --green-deep: #168a42; --amber: #f4c95d;
+      --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; overflow-x: hidden; background: var(--bg); color: var(--text); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; }
+    .container { width: min(1120px, calc(100% - 40px)); margin-inline: auto; }
+    .skip { position: absolute; left: 12px; top: -80px; z-index: 10; background: var(--text); color: var(--bg); padding: 8px 12px; border-radius: 8px; }
+    .skip:focus { top: 12px; }
+    nav { display: flex; align-items: center; justify-content: space-between; min-height: 72px; gap: 20px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 750; text-decoration: none; }
+    .mark { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; color: #04210c; background: linear-gradient(135deg, #75ee9c, #1aaa51); }
+    .nav-links { display: flex; align-items: center; gap: 20px; font-size: 14px; color: var(--dim); }
+    .nav-links a { text-decoration: none; }
+    .nav-links a:hover { color: var(--text); }
+    .hero { position: relative; overflow: clip; padding: 96px 0 76px; text-align: center; }
+    .hero::before { content: ""; position: absolute; z-index: -1; inset: -160px -20vw auto; height: 600px; background: radial-gradient(ellipse at center, rgba(55, 207, 103, .15), transparent 65%); }
+    .eyebrow { display: inline-flex; gap: 8px; align-items: center; padding: 5px 13px; border: 1px solid var(--border); border-radius: 999px; color: var(--green); background: rgba(82, 225, 132, .05); font-size: 13px; }
+    h1 { max-width: 900px; margin: 24px auto 20px; font-size: clamp(42px, 7vw, 72px); line-height: 1.03; letter-spacing: -.045em; }
+    h1 span { color: var(--green); }
+    .lead { max-width: 720px; margin: 0 auto; color: var(--dim); font-size: clamp(17px, 2.5vw, 20px); }
+    .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 32px; }
+    .button { display: inline-flex; min-width: 0; max-width: 100%; min-height: 46px; align-items: center; justify-content: center; padding: 10px 20px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); text-align: center; text-decoration: none; overflow-wrap: anywhere; font-weight: 700; cursor: pointer; }
+    .button.primary { border-color: #1eae56; background: var(--green-deep); box-shadow: 0 10px 35px rgba(22, 138, 66, .25); }
+    .button:hover { transform: translateY(-1px); }
+    .proof { margin: 44px auto 0; display: grid; grid-template-columns: repeat(3, 1fr); max-width: 780px; border: 1px solid var(--border); border-radius: 14px; background: rgba(14, 24, 17, .76); text-align: left; }
+    .proof div { padding: 18px; min-width: 0; }
+    .proof div + div { border-left: 1px solid var(--border); }
+    .proof strong { display: block; font-size: 14px; }
+    .proof span { color: var(--dim); font-size: 13px; }
+    section { padding: 76px 0; }
+    .section-head { max-width: 720px; margin-bottom: 34px; }
+    .section-head.center { margin-inline: auto; text-align: center; }
+    h2 { margin: 0 0 12px; font-size: clamp(30px, 5vw, 45px); line-height: 1.12; letter-spacing: -.03em; }
+    .section-head p { margin: 0; color: var(--dim); }
+    .walkthrough { border: 1px solid var(--border); border-radius: 18px; background: var(--surface); overflow: hidden; }
+    .walk-top { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-width: 0; }
+    .steps { padding: 18px; border-right: 1px solid var(--border); }
+    .step { width: 100%; display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: center; padding: 10px; border: 0; border-radius: 9px; background: transparent; color: var(--dim); text-align: left; cursor: pointer; }
+    .step + .step { margin-top: 4px; }
+    .step:hover, .step.active { background: var(--surface-2); color: var(--text); }
+    .step.done .step-number { background: var(--green-deep); color: white; }
+    .step-number { width: 26px; height: 26px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; font: 12px var(--mono); }
+    .step-label strong { display: block; font-size: 13px; }
+    .step-label span { font-size: 11px; color: var(--dim); }
+    .simulation { min-width: 0; padding: 24px; }
+    .sim-head { display: flex; justify-content: space-between; gap: 16px; align-items: start; margin-bottom: 20px; }
+    .sim-head h3 { margin: 0 0 4px; font-size: 20px; }
+    .sim-head p { margin: 0; color: var(--dim); font-size: 14px; }
+    .balance { flex: 0 0 auto; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; font: 12px var(--mono); color: var(--green); }
+    .io-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; }
+    .io { min-width: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #09100b; }
+    .io header { display: flex; justify-content: space-between; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--dim); font: 11px var(--mono); }
+    pre { margin: 0; max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+    .io pre { min-height: 260px; padding: 14px; color: #cfe2d2; font: 12px/1.55 var(--mono); }
+    .effect { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; margin-top: 12px; padding: 13px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+    .effect strong { display: block; font-size: 13px; }
+    .effect span { color: var(--dim); font-size: 12px; overflow-wrap: anywhere; }
+    .effect .delta { color: var(--green); font: 12px var(--mono); }
+    .walk-controls { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 18px; border-top: 1px solid var(--border); background: #0b140e; }
+    .walk-controls p { margin: 0; color: var(--dim); font-size: 12px; }
+    .control-buttons { display: flex; gap: 8px; }
+    .control-buttons button { min-height: 38px; padding: 7px 13px; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .card { min-width: 0; padding: 22px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+    .card h3 { margin: 8px 0; font-size: 17px; }
+    .card p { margin: 0; color: var(--dim); font-size: 14px; }
+    .card a { display: inline-block; margin-top: 14px; color: var(--green); font-size: 13px; text-decoration: none; }
+    .path-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .path { min-width: 0; padding: 28px; border: 1px solid var(--border); border-radius: 16px; background: linear-gradient(150deg, var(--surface-2), var(--surface)); }
+    .path small { color: var(--green); text-transform: uppercase; letter-spacing: .08em; }
+    .path h3 { margin: 8px 0; font-size: 22px; }
+    .path p { color: var(--dim); font-size: 14px; }
+    .path a { color: var(--green); font-weight: 700; text-decoration: none; }
+    .boundary { padding: 24px; border-left: 3px solid var(--amber); border-radius: 0 12px 12px 0; background: rgba(244, 201, 93, .06); color: var(--dim); }
+    .boundary strong { color: var(--text); }
+    footer { margin-top: 40px; border-top: 1px solid var(--border); }
+    footer .container { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; padding-block: 30px; color: var(--dim); font-size: 13px; }
+    footer a { margin-right: 16px; text-decoration: none; }
+    @media (max-width: 860px) {
+      .nav-links a:first-child { display: none; }
+      .proof, .grid, .path-grid { grid-template-columns: 1fr; }
+      .proof div + div { border-left: 0; border-top: 1px solid var(--border); }
+      .walk-top { grid-template-columns: 1fr; }
+      .steps { display: flex; gap: 6px; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); }
+      .step { flex: 0 0 auto; width: auto; }
+      .step-label span { display: none; }
+    }
+    @media (max-width: 620px) {
+      .container { width: min(100% - 28px, 1120px); }
+      nav { min-height: 62px; }
+      .brand { font-size: 14px; }
+      .nav-links { gap: 12px; }
+      .nav-links a:nth-child(2) { display: none; }
+      .hero { padding: 70px 0 50px; }
+      h1 { font-size: clamp(36px, 10.5vw, 42px); }
+      h1 span { display: block; }
+      section { padding: 54px 0; }
+      .io-grid { grid-template-columns: minmax(0, 1fr); }
+      .io pre { min-height: 0; max-height: 280px; overflow-y: auto; }
+      .sim-head, .walk-controls { align-items: stretch; flex-direction: column; }
+      .balance { align-self: flex-start; }
+      .control-buttons { width: 100%; }
+      .control-buttons .button { flex: 1; }
+      .effect { grid-template-columns: minmax(0, 1fr); }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="container">
+    <nav aria-label="Primary">
+      <a class="brand" href="/"><span class="mark">L</span>Loyalty Interchange Protocol</a>
+      <div class="nav-links">
+        <a href="#walkthrough">Walkthrough</a>
+        <a href="https://loyalty-interchange.mintlify.app">Docs</a>
+        <a href="https://github.com/craveup-oss/loyalty-interchange-protocol">GitHub</a>
+      </div>
+    </nav>
+  </div>
+
+  <main id="main">
+    <header class="hero">
+      <div class="container">
+        <span class="eyebrow">Apache-2.0 · LIP 0.2.0 · Node 22</span>
+        <h1>The open-source loyalty platform for <span>restaurant technology teams.</span></h1>
+        <p class="lead">Own the marketer workspace, customer data, campaigns, guest wallet, and checkout lifecycle. Self-host the Apache-2.0 stack or use the open protocol inside an existing ordering platform.</p>
+        <div class="actions">
+          <a class="button primary" href="#walkthrough" data-analytics-event="walkthrough_started">Run the lifecycle</a>
+          <a class="button" href="https://loyalty-interchange.mintlify.app/get-started/quickstart" data-analytics-event="docs_quickstart">Self-host the quickstart</a>
+        </div>
+        <div class="proof" aria-label="Product evidence">
+          <div><strong>Marketer + guest experience</strong><span>Segments, campaigns, holdouts, attribution, branded wallet</span></div>
+          <div><strong>Restaurant transaction core</strong><span>Modifiers, split tender, offline replay, void, refund</span></div>
+          <div><strong>Deployable evidence</strong><span>Docker, Postgres, OpenAPI, SDK, fixture certification, conformance</span></div>
+        </div>
+      </div>
+    </header>
+
+    <section id="walkthrough" aria-labelledby="walkthrough-title">
+      <div class="container">
+        <div class="section-head">
+          <h2 id="walkthrough-title">Run checkout through refund.</h2>
+          <p>This deterministic simulation runs entirely in your browser with synthetic data. It sends no order, identity, or credential anywhere. Select a step or run them in sequence.</p>
+        </div>
+        <div class="walkthrough">
+          <div class="walk-top">
+            <div class="steps" id="steps" role="tablist" aria-label="Lifecycle operations"></div>
+            <div class="simulation" aria-live="polite">
+              <div class="sim-head">
+                <div><h3 id="step-title"></h3><p id="step-description"></p></div>
+                <div class="balance" id="balance">600 points · 600 available</div>
+              </div>
+              <div class="io-grid">
+                <article class="io"><header><span>REQUEST</span><span id="operation"></span></header><pre id="request"></pre></article>
+                <article class="io"><header><span>RESPONSE</span><span>synthetic</span></header><pre id="response"></pre></article>
+              </div>
+              <div class="effect"><div><strong>Ledger / account effect</strong><span id="ledger"></span></div><span class="delta" id="delta"></span></div>
+            </div>
+          </div>
+          <div class="walk-controls">
+            <p>Idempotency key: <code id="key"></code></p>
+            <div class="control-buttons"><button class="button" id="reset" type="button">Reset</button><button class="button primary" id="next" type="button">Run step</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="product-title">
+      <div class="container">
+        <div class="section-head center"><h2 id="product-title">A loyalty operating system you can inspect.</h2><p>The platform layer handles day-to-day growth workflows. The separate LIP protocol keeps checkout behavior portable for POS, ordering, payment, and loyalty integrations.</p></div>
+        <div class="grid">
+          <article class="card"><span>◫</span><h3>Marketer workspace</h3><p>Build consent-aware audiences, schedule campaigns, reserve deterministic holdouts, and measure conversion within an attribution window.</p><a href="https://github.com/craveup-oss/loyalty-interchange-protocol/blob/main/docs/platform-api.md">Explore the platform API →</a></article>
+          <article class="card"><span>◎</span><h3>Reference guest wallet</h3><p>Use a branded, responsive wallet with OIDC Authorization Code + PKCE and a BFF that keeps merchant credentials off the device.</p><a href="https://github.com/craveup-oss/loyalty-interchange-protocol/blob/main/docs/wallet.md">Review the wallet boundary →</a></article>
+          <article class="card"><span>⇢</span><h3>Restaurant onboarding</h3><p>Import consented members from bounded CSV files and map current Square Orders and refunds through typed, synthetic certification fixtures.</p><a href="https://github.com/craveup-oss/loyalty-interchange-protocol/blob/main/docs/square.md">Review Square scope →</a></article>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="audience-title">
+      <div class="container">
+        <div class="section-head"><h2 id="audience-title">Built for teams that own the integration.</h2><p>LIP is strongest when restaurant loyalty has to connect cleanly to ordering, payments, refunds, locations, and existing customer identity.</p></div>
+        <div class="path-grid">
+          <article class="path"><small>Platforms</small><h3>POS and ordering products</h3><p>Add a loyalty product without outsourcing the core ledger, campaign data, or checkout contract to a closed vendor.</p></article>
+          <article class="path"><small>Operators</small><h3>Multi-unit technical teams</h3><p>Run a portable stack across brands and locations when data ownership, migrations, and refund correctness matter.</p></article>
+          <article class="path"><small>Integrators</small><h3>Restaurant agencies and builders</h3><p>Start from tested APIs and adapters instead of rebuilding balances, idempotency, wallets, and campaign plumbing for every client.</p></article>
+        </div>
+        <div class="boundary" style="margin-top: 18px"><strong>Not the best fit yet:</strong> a restaurant that wants a no-code, turnkey consumer marketing service with no technical owner. This repository is pre-1.0 infrastructure and a reference product, not a claim of feature parity with every mature commercial suite.</div>
+      </div>
+    </section>
+
+    <section aria-labelledby="moat-title">
+      <div class="container">
+        <div class="section-head center"><h2 id="moat-title">The durable moat is lifecycle correctness.</h2><p>Campaign tooling is useful; trustworthy ordering behavior is foundational. LIP makes both inspectable while keeping the portable transaction contract explicit.</p></div>
+        <div class="grid">
+          <article class="card"><span>↻</span><h3>Retry without double posting</h3><p>Stable business keys, exact replay, explicit payload conflict, immutable ledger linkage.</p><a href="https://github.com/craveup-oss/loyalty-interchange-protocol/blob/main/docs/idempotency.md">Read idempotency →</a></article>
+          <article class="card"><span>⌁</span><h3>Certify the source mapping</h3><p>A typed adapter contract and fixture runner cover modifiers, combos, tenders, comps, offline delivery, void, and refund.</p><a href="https://github.com/craveup-oss/loyalty-interchange-protocol/blob/main/docs/ordering-adapters.md">Read adapter guide →</a></article>
+          <article class="card"><span>⇄</span><h3>Leave with your state</h3><p>Checksummed full-state archives plus member/opening-balance plans and reconciliation reports.</p><a href="https://github.com/craveup-oss/loyalty-interchange-protocol/blob/main/docs/member-migration.md">Read migration guide →</a></article>
+          <article class="card"><span>▦</span><h3>Operate the open stack</h3><p>SQLite or normalized tenant-scoped Postgres, Admin, webhooks, metrics, key rotation, and conformance.</p><a href="https://loyalty-interchange.mintlify.app/guides/reference-platform">Reference platform →</a></article>
+          <article class="card"><span>◇</span><h3>Choose with evidence</h3><p>Compare lifecycle, portability, recovery, integration effort, marketer workflow, and ownership.</p><a href="https://github.com/craveup-oss/loyalty-interchange-protocol/blob/main/docs/provider-selection.md">Provider selection →</a></article>
+          <article class="card"><span>◎</span><h3>Keep identity separate</h3><p>Your BFF verifies the customer and retains the merchant key. LIP receives only an opaque member id.</p><a href="https://loyalty-interchange.mintlify.app/guides/customer-identity">Identity boundary →</a></article>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="paths-title">
+      <div class="container">
+        <div class="section-head"><h2 id="paths-title">Choose the next proof.</h2><p>The protocol, reference implementation, and managed path stay explicit so adoption never depends on lock-in.</p></div>
+        <div class="path-grid">
+          <article class="path"><small>Evaluate</small><h3>Browser walkthrough</h3><p>Finish the synthetic lifecycle above and inspect every request, result, key, and ledger effect.</p><a href="#walkthrough">Reset and run it →</a></article>
+          <article class="path"><small>Build</small><h3>Self-host</h3><p>Clone the Apache-2.0 stack, start Docker, inspect Admin, then run black-box conformance.</p><a href="https://loyalty-interchange.mintlify.app/get-started/quickstart" data-analytics-event="self_host_selected">Open quickstart →</a></article>
+          <article class="path"><small>Partner</small><h3>Map a real source</h3><p>Bring one ordering/refund edge. Produce a certified adapter, migration rehearsal, and cutover record.</p><a href="https://github.com/craveup-oss/loyalty-interchange-protocol/blob/main/docs/design-partners.md" data-analytics-event="design_partner_selected">Design partner details →</a></article>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container"><div class="boundary"><strong>Truthful boundary:</strong> LIP 0.2.0 is pre-1.0 software. The repository tests and reports prove behavior of the supplied implementation and fixtures; they do not prove independent adoption, vendor endorsement, production SLO attainment, or benchmark leadership.</div></div>
+    </section>
+  </main>
+
+  <footer><div class="container"><span>Loyalty Interchange Protocol · Apache-2.0</span><span><a href="https://github.com/craveup-oss/loyalty-interchange-protocol">GitHub</a><a href="https://loyalty-interchange.mintlify.app">Docs</a><a href="https://github.com/craveup-oss/loyalty-interchange-protocol/discussions">Discussions</a><a href="mailto:opensource@craveup.com">Contact</a></span></div></footer>
+
+  <script>
+    const base = { protocol_version: "1.0", profile: "foodservice/1.0", source: { system: "browser-walkthrough" } };
+    const order = { order_id: "order-demo-1001", scope: { program_id: "demo-foodservice", location_id: "location-7" }, member_id: "member-demo", channel: "mobile", status: "paid", lines: [{ line_id: "burger", kind: "item", quantity: 1, subtotal: { amount: 1200, currency: "USD" } }, { line_id: "cheese", kind: "modifier", parent_line_id: "burger", quantity: 1, subtotal: { amount: 200, currency: "USD" } }], totals: { subtotal: { amount: 1400, currency: "USD" }, discount: { amount: 200, currency: "USD" }, tax: { amount: 96, currency: "USD" }, tip: { amount: 200, currency: "USD" }, service_charge: { amount: 0, currency: "USD" }, total: { amount: 1496, currency: "USD" } }, tenders: [{ tender_id: "card", type: "card", amount: { amount: 996, currency: "USD" } }, { tender_id: "gift", type: "gift_card", amount: { amount: 500, currency: "USD" } }] };
+    const operations = [
+      { label: "Evaluate", verb: "POST /orders/evaluate", key: "evaluate:order-demo-1001", description: "Preview earning and reward eligibility before payment.", request: { member_id: "member-demo", order }, response: { evaluation_id: "eval_demo_1", estimated_accrual: { unit: "points", amount: 120 }, eligible_rewards: ["five-off"] }, ledger: "No mutation. Evaluation expires after the configured quote window.", delta: "+120 estimated", balance: "600 points · 600 available" },
+      { label: "Reserve", verb: "POST /redemptions/reserve", key: "reserve:checkout-failed:five-off", description: "Hold reward value while the first payment attempt runs.", request: { redemption_id: "redeem_failed_1", member_id: "member-demo", reward_id: "five-off", order: { ...order, order_id: "checkout-failed", status: "open", tenders: undefined } }, response: { reservation: { reservation_id: "res_failed_1", status: "reserved", cost: { unit: "points", amount: 500 } } }, ledger: "Reservation holds 500 points; balance is unchanged but available value falls.", delta: "−500 available", balance: "600 points · 100 available" },
+      { label: "Reverse", verb: "POST /redemptions/reverse", key: "reverse:checkout-failed:res_failed_1", description: "Release the hold after payment failure.", request: { reservation_id: "res_failed_1", reason: "Payment authorization failed" }, response: { reservation: { reservation_id: "res_failed_1", status: "reversed" }, balances: [{ unit: "points", amount: 600, reserved: 0, available: 600 }] }, ledger: "redemption.reversed releases the failed checkout reservation.", delta: "+500 available", balance: "600 points · 600 available" },
+      { label: "Reserve retry", verb: "POST /redemptions/reserve", key: "reserve:order-demo-1001:five-off", description: "Create a new hold for the successful checkout; do not reuse the failed event key.", request: { redemption_id: "redeem_success_1", member_id: "member-demo", reward_id: "five-off", order: { ...order, status: "open", tenders: undefined } }, response: { reservation: { reservation_id: "res_success_1", status: "reserved", cost: { unit: "points", amount: 500 } } }, ledger: "A distinct checkout event creates a distinct reservation and idempotency key.", delta: "−500 available", balance: "600 points · 100 available" },
+      { label: "Accrue", verb: "POST /accruals", key: "accrual:order-demo-1001", description: "Post earning once the payment provider settles.", request: { member_id: "member-demo", evaluation_id: "eval_demo_1", order }, response: { entry: { entry_id: "ledger_accrual_1", type: "accrual", amount: 120, source_order_id: "order-demo-1001" }, balances: [{ unit: "points", amount: 720, reserved: 500, available: 220 }] }, ledger: "One source-linked accrual adds 120; an identical delivery returns this result.", delta: "+120 points", balance: "720 points · 220 available" },
+      { label: "Capture", verb: "POST /redemptions/capture", key: "capture:order-demo-1001:res_success_1", description: "Finalize the reserved reward against the paid order.", request: { reservation_id: "res_success_1", order_id: "order-demo-1001" }, response: { reservation: { reservation_id: "res_success_1", status: "captured" }, balances: [{ unit: "points", amount: 220, reserved: 0, available: 220 }] }, ledger: "redemption.captured consumes the 500-point hold exactly once.", delta: "−500 points", balance: "220 points · 220 available" },
+      { label: "Refund adjust", verb: "POST /orders/adjust", key: "adjustment:order-demo-1001:refund-1", description: "Claw back earning for a partial refund without inventing a negative purchase.", request: { member_id: "member-demo", program_id: "demo-foodservice", adjustment: { adjustment_id: "refund-1", original_order_id: "order-demo-1001", type: "partial_refund", order_total_delta: { amount: -300, currency: "USD" }, eligible_spend_delta: { amount: -240, currency: "USD" } } }, response: { entry: { entry_id: "ledger_adjustment_1", type: "adjustment", amount: -24, source_order_id: "order-demo-1001" }, balances: [{ unit: "points", amount: 196, reserved: 0, available: 196 }] }, ledger: "A source-linked adjustment reverses 24 of the original earned points.", delta: "−24 points", balance: "196 points · 196 available" }
+    ];
+    let current = 0; let completed = -1;
+    const $ = (id) => document.getElementById(id);
+    const context = (key, index) => ({ ...base, request_id: `walkthrough-${index + 1}`, idempotency_key: key, occurred_at: "2026-08-15T18:00:00.000Z" });
+    function emit(name, detail = {}) { window.dispatchEvent(new CustomEvent("lip:activation", { detail: { event: name, ...detail } })); }
+    function render() {
+      const value = operations[current];
+      $("step-title").textContent = value.label; $("step-description").textContent = value.description;
+      $("operation").textContent = value.verb; $("key").textContent = value.key;
+      $("request").textContent = JSON.stringify({ context: context(value.key, current), ...value.request }, null, 2);
+      $("response").textContent = JSON.stringify({ context: context(value.key, current), ...value.response }, null, 2);
+      $("ledger").textContent = value.ledger; $("delta").textContent = value.delta;
+      $("balance").textContent = completed >= current ? value.balance : (current ? operations[Math.min(completed, current - 1)]?.balance ?? operations[0].balance : operations[0].balance);
+      $("next").textContent = completed >= current ? (current === operations.length - 1 ? "Completed" : "Next step") : "Run step";
+      document.querySelectorAll(".step").forEach((node, index) => { node.classList.toggle("active", index === current); node.classList.toggle("done", index <= completed); node.setAttribute("aria-selected", String(index === current)); });
+    }
+    operations.forEach((value, index) => { const button = document.createElement("button"); button.className = "step"; button.type = "button"; button.role = "tab"; button.innerHTML = `<span class="step-number">${index + 1}</span><span class="step-label"><strong>${value.label}</strong><span>${value.verb.replace("POST ", "")}</span></span>`; button.addEventListener("click", () => { current = index; render(); }); $("steps").append(button); });
+    $("next").addEventListener("click", () => { if (completed < current) { completed = current; emit("walkthrough_step", { step: operations[current].label }); if (completed === operations.length - 1) emit("walkthrough_completed"); } else if (current < operations.length - 1) current += 1; render(); });
+    $("reset").addEventListener("click", () => { current = 0; completed = -1; emit("walkthrough_started", { source: "reset" }); render(); });
+    document.querySelectorAll("[data-analytics-event]").forEach((node) => node.addEventListener("click", () => emit(node.dataset.analyticsEvent)));
+    render();
+  </script>
+  <script>
+    (() => {
+      const key = document.querySelector('meta[name="posthog-key"]')?.content.trim();
+      const host = document.querySelector('meta[name="posthog-host"]')?.content.trim();
+      const allowedHosts = new Set(["https://us.i.posthog.com", "https://eu.i.posthog.com"]);
+      if (!key || !host || !allowedHosts.has(host)) return;
+
+      !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/1/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+
+      const events = new Set([
+        "landing_viewed", "walkthrough_started", "walkthrough_step",
+        "walkthrough_completed", "docs_quickstart", "self_host_selected",
+        "design_partner_selected"
+      ]);
+      const steps = new Set(["Evaluate", "Reserve", "Reverse", "Reserve retry", "Accrue", "Capture", "Refund adjust"]);
+      posthog.init(key, {
+        api_host: host,
+        defaults: "2026-05-30",
+        cookieless_mode: "always",
+        person_profiles: "never",
+        autocapture: false,
+        capture_pageview: false,
+        capture_pageleave: false,
+        capture_dead_clicks: false,
+        capture_exceptions: false,
+        capture_heatmaps: false,
+        capture_performance: false,
+        disable_session_recording: true,
+        disable_surveys: true,
+        advanced_disable_flags: true,
+        remote_config_refresh_interval_ms: 0,
+        mask_all_text: true,
+        mask_all_element_attributes: true,
+        respect_dnt: true,
+        before_send: (event) => {
+          if (!events.has(event.event)) return null;
+          const step = event.properties?.step;
+          event.properties = step && steps.has(step) ? { step } : {};
+          return event;
+        },
+        loaded: (client) => client.capture("landing_viewed")
+      });
+      window.addEventListener("lip:activation", (event) => {
+        const detail = event.detail ?? {};
+        if (!events.has(detail.event)) return;
+        posthog.capture(detail.event, detail.step && steps.has(detail.step) ? { step: detail.step } : {});
+      });
+    })();
+  </script>
+</body>
+</html>
