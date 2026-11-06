@@ -52,3 +52,6 @@ packages/mcp/assets/
 
 # Git worktrees (isolated feature branches)
 .worktrees/
+
+# Claude Code local settings (per-machine, never committed)
+.claude/settings.local.json

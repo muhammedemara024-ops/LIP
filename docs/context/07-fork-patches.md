@@ -6,4 +6,4 @@ Changes to `/lip/v1` wire semantics or `spec/` are never allowed and never appea
 
 | File | Reason | PD reference | Upgrade impact |
 | --- | --- | --- | --- |
-| `.gitignore` | Workspace hygiene | PD-002 | Trivial merge |
+| `.gitignore` | Workspace hygiene; ignores `.claude/settings.local.json` (per-machine Claude Code settings) | PD-002 | Trivial merge |
