@@ -480,10 +480,66 @@ Domain name (~$1/month) and messaging (WhatsApp/SMS) are not included.
 
 Date / approved by: 2026-11-06, project owner.
 
-## PD-007 — Languages — Proposed (brief says "suggested")
+## PD-007 — Arabic-first, English second — Approved (2026-11-06)
 
-Arabic (RTL) is the default UI language; English second. All customer-facing
-copy, reward names and messages must be localizable per business.
+Context: the brief requires Arabic + English with RTL as first class (G-14).
+LIP has no localization: `ProgramDefinition.name/description` and
+`RewardDefinition.name/description` are single optional strings
+(`packages/reference/src/config.ts`), and nothing in `packages/protocol` or
+`spec/` mentions a locale.
+
+Decision: Arabic (RTL) is the default language of every product surface;
+English is second. Localized content lives in our layer, never in LIP.
+
+Consequences:
+
+*UI language*
+- The customer, staff and owner surfaces default to Arabic RTL regardless of
+  browser or phone language; anyone can switch to English. The choice is stored
+  on the account (customer, staff member, owner).
+- Before sign-in (landing and OTP screens) the choice is kept in a cookie and
+  copied to the account at sign-in.
+- Super-admin screens may stay English-only for now.
+
+*Café content*
+- LIP keeps one internal label per program/reward in its `name` field. Display
+  text per language (program names, reward names and descriptions, branch
+  names) is stored in our layer, keyed by `program_id` / `reward_id` / branch
+  id and language. No fork patch adds locales to LIP.
+- Each café chooses its main content language (Arabic by default). Main-language
+  text is required; the other language is optional and falls back to the main
+  one. The program wizard (task 3.7) asks for both, requires only the main one.
+
+*Numbers, money, direction*
+- Western digits (0–9) are displayed in both languages, including prices,
+  codes, phone numbers and balances. Every input accepts Western, Arabic-Indic
+  and Persian digits and normalizes them to Western.
+- Money format: Arabic `45 ج.م` / `45.50 ج.م` (ج.م = جنيه مصري); English
+  `EGP 45` / `EGP 45.50`. Zero piasters are hidden; two decimals are shown only
+  when piasters are non-zero.
+- The cashier enters pounds with up to two decimals; the BFF converts to integer
+  piasters, never floats (golden rule 2).
+- Codes, phone numbers and amounts inside Arabic text are rendered with Unicode
+  bidi isolation (`<bdi>` or `dir="ltr"` on the element), never by inserting
+  directional control characters.
+
+*Messages*
+- OTP, transactional and (later) marketing messages follow the customer's
+  language. At launch every WhatsApp template (OTP, transactional) exists in
+  Arabic; English versions are optional and fall back to Arabic. Each language
+  version needs its own Meta approval (0.11-dependent). Café-written marketing
+  text follows the café's main-language rule.
+
+*Time*
+- Dates and times are displayed in the IANA zone `Africa/Cairo`, Gregorian
+  calendar. Day-based business rules (expiry, birthdays, send windows, the
+  7/14/30-day inactivity checks, subscription stages) use `Africa/Cairo`.
+  Timestamps are stored in UTC.
+- Always the zone name `Africa/Cairo`, never a fixed offset such as `+02:00`:
+  Egypt observes daylight saving time. LIP's `tier_policy` time zone (when tiers
+  ship) is set to `Africa/Cairo` for the same reason.
+
+Date / approved by: 2026-11-06, project owner.
 
 ---
 

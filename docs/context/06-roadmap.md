@@ -38,7 +38,7 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
 | 0.2 | Decide PD-003: staff scan is the only path that grants value | — | — | PD-003 Approved | 2026-11-06 — Approved |
 | 0.3 | Decide PD-004: customer OTP provider + channel (SMS/WhatsApp) | G-06 | — | Provider and channel chosen. (JWKS condition dropped: PD-004 runs OTP in our BFF, so there is no outside token to verify. Real-number delivery test moved to 2.4.) | 2026-11-06 — Approved, conditional on the 2.4 real-number test |
 | 0.4 | Decide PD-006: hosting (LIP, BFF and one Next.js app on a container host in Frankfurt; Postgres provider) | — | 0.1 | Approved; region chosen; per-service monthly cost table ≤ $100 for staging + production | 2026-11-06 — Approved (Render Frankfurt, Pro workspace, Render Postgres), conditional |
-| 0.5 | Decide PD-007: Arabic-first, English second | G-14 | — | Approved | |
+| 0.5 | Decide PD-007: Arabic-first, English second | G-14 | — | Approved | 2026-11-06 — Approved |
 | 0.6 | New decision: purchase capture = bill amount only vs items | G-04 | 0.2 | Decision recorded with its effect on product exclusions | |
 | 0.7 | Baseline: `npm ci && npm run typecheck && npm test` on Node 22 | — | — | All green, result + Node version recorded here | |
 | 0.8 | Baseline: run Postgres profile + `lip doctor` + `lip test` | — | 0.7 | Conformance passes against Postgres runtime; idle memory of the LIP process recorded (sizes the instance, PD-006) | |
@@ -75,7 +75,7 @@ application code is written.
 | 2.5 | Cashier role: protocol write limited to accrue/redeem at own location; minimal customer view | G-05 | 2.2 | Permission tests: cashier cannot export, edit program, post manual adjustments, or act in other branch; staff phone OTP-verified at creation, change needs owner approval | |
 | 2.6 | Staff PIN login per branch device + device registration | G-05 | 2.5 | Lost device can be revoked by owner | |
 | 2.7 | Move platform state (profiles, events, segments, campaigns) from JSON blob to RLS tables; make the platform layer multi-instance-safe | G-11 | 2.2 | Platform state lives in revisioned rows; no 100k event truncation; every scheduler (campaign, engagement, membership) and the webhook dispatcher run under `withLease()`; a test starts two instances and proves a due campaign runs exactly once; load test with 500 tenants × 10k customers | |
-| 2.8 | i18n + RTL infrastructure; localizable program/reward names | G-14 | 0.5 | Arabic and English render correctly; numbers/currency formatted for EGP | |
+| 2.8 | i18n + RTL infrastructure; localizable program/reward names | G-14 | 0.5 | Arabic (default, RTL) and English render correctly; language stored per account (cookie before sign-in); Western digits, digit normalization on input; EGP format hides zero piasters; bidi isolation for codes/amounts; `Africa/Cairo` everywhere (PD-007) | |
 | 2.9 | Audit log coverage for every staff/owner write | — | 2.5 | Every write has actor, branch, device, time | |
 
 **DoD:** M2 — isolation tests for all new tables pass; OTP sign-in on staging; cashier role enforced server-side.
@@ -90,7 +90,7 @@ application code is written.
 | 3.4 | Redemption at counter: reserve → capture, cancel → reverse | — | 3.3 | A reward can never be used twice, including two cashiers at once; customer app cannot reserve or capture | |
 | 3.5 | Branch QR + pending claim queue + cashier confirm | G-03 | 3.3 | Claim never grants value until confirmed; cashier must type the claim code (unique among open claims at the branch); wrong code rejected, 3 wrong codes cancel the claim; expires after 15 min; one open claim per customer/branch | |
 | 3.6 | Undo / correction flow (staff requests, owner approves → manual adjustment) | — | 3.3, 2.9 | Classified adjustment with reason; visible in audit | |
-| 3.7 | Program wizard: stamps and points programs without JSON | G-08 | 2.8 | Owner creates "5 drinks → 1 free" in < 3 min; publishes via draft/publish | |
+| 3.7 | Program wizard: stamps and points programs without JSON | G-08 | 2.8 | Owner creates "5 drinks → 1 free" in < 3 min; publishes via draft/publish; asks for both languages, requires only the café's main language (PD-007) | |
 | 3.8 | Anti-fraud rules v1 (scan velocity, out-of-hours, staff→same customers) | — | 3.3 | Owner alert generated in test scenarios | |
 
 **DoD:** M3 — full earn/redeem loop on staging with real phones; abuse test cases pass.

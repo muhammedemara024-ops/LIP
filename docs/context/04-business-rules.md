@@ -109,6 +109,27 @@ Method A — customer scans branch QR (convenience path):
 - Owner alert on anomalies: many scans of the same customer in a short window,
   scans outside opening hours, a staff member awarding to the same few customers.
 
+## Language & locale (OURS, PD-007)
+
+- Default UI language is Arabic (RTL) on every product surface, regardless of
+  browser/phone language; English is second. The choice is stored on the
+  account; before sign-in it is kept in a cookie and copied at sign-in.
+- MUST: localized display text (program, reward, branch names/descriptions) is
+  stored in our layer keyed by id + language; LIP keeps one internal label.
+- MUST: each café's main content language is required; the other is optional
+  and falls back to the main one.
+- MUST: Western digits (0–9) on display; inputs accept Western, Arabic-Indic and
+  Persian digits and normalize to Western.
+- MUST: money shows as `45 ج.م` / `45.50 ج.م` (Arabic) and `EGP 45` /
+  `EGP 45.50` (English); zero piasters are hidden. Entered pounds are converted
+  to integer piasters.
+- MUST: codes, phone numbers and amounts inside Arabic text use Unicode bidi
+  isolation (`<bdi>` / `dir="ltr"`), never inserted control characters.
+- MUST: messages follow the customer's language; every launch WhatsApp template
+  exists in Arabic; English falls back to Arabic.
+- MUST: time zone is always the IANA name `Africa/Cairo` (never a fixed offset;
+  Egypt observes DST) for display and day-based rules; timestamps stored in UTC.
+
 ## Customer sign-in (OURS, PD-004)
 
 - MUST: OTP codes are stored as an HMAC with a server-side secret (never plain
