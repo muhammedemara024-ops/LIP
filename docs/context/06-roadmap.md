@@ -1,0 +1,156 @@
+# Roadmap — phases, tasks, dependencies, acceptance
+
+> ملخص: 8 مراحل (0 → 7). مفيش تطوير Features قبل ما المرحلة 0 تخلص.
+> كل مهمة مربوطة بالفجوة اللي بتقفلها (G-xx في `03-gap-analysis.md`) وبالقرار
+> اللي بتعتمد عليه (PD-xxx في `01-decisions.md`).
+
+Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 starts.
+
+## Rules for Claude and contributors
+
+1. Work only on tasks whose phase gate is open and whose dependencies are done.
+2. A task that depends on a **Proposed** decision is blocked until that decision is Approved.
+3. Every task ends with: tests passing, docs/context updated if behavior changed,
+   and a one-line entry in the task's "Done" column (date + commit).
+4. New ideas go to the Backlog section at the bottom, never into an active phase.
+5. Estimates are deliberately omitted until Phase 0 measures the real baseline.
+
+## Milestones
+
+| ID | Milestone | Exit = phase gate |
+| --- | --- | --- |
+| M0 | Decisions locked, baseline proven | Phase 0 DoD |
+| M1 | PRD v1.0 + clickable Arabic prototype approved | Phase 1 DoD |
+| M2 | Foundation: platform identity, cashier role, scalable data, OTP | Phase 2 DoD |
+| M3 | A cashier can award and redeem in a real café flow (staging) | Phase 3 DoD |
+| M4 | Customer web app + owner dashboard MVP | Phase 4 DoD |
+| M5 | Pilot live in 1–3 real cafés | Phase 5 DoD |
+| M6 | Paid launch: Kashier billing, automation, WhatsApp, retention KPIs | Phase 6 DoD |
+| M7 | Mobile app, geofencing, advanced analytics | Phase 7 DoD |
+
+---
+
+## Phase 0 — Decisions & baseline (gate)
+
+| ID | Task | Closes | Depends on | Acceptance criteria | Done |
+| --- | --- | --- | --- | --- | --- |
+| 0.1 | Decide PD-002: adopt LIP as loyalty core (fork + pin 0.2.0) | — | — | PD-002 Approved or Superseded in 01-decisions.md | |
+| 0.2 | Decide PD-003: staff scan is the only path that grants value | — | — | PD-003 Approved | |
+| 0.3 | Decide PD-004: customer OTP provider + channel (SMS/WhatsApp) | G-06 | — | Provider chosen; confirmed it issues JWKS-verifiable JWTs; Egyptian delivery tested with one real number | |
+| 0.4 | Decide PD-006: hosting (Next.js on Vercel, LIP runtime on container host, Postgres provider) | — | 0.1 | Approved; region chosen; monthly cost estimate written | |
+| 0.5 | Decide PD-007: Arabic-first, English second | G-14 | — | Approved | |
+| 0.6 | New decision: purchase capture = bill amount only vs items | G-04 | 0.2 | Decision recorded with its effect on product exclusions | |
+| 0.7 | Baseline: `npm ci && npm run typecheck && npm test` on Node 22 | — | — | All green, result + Node version recorded here | |
+| 0.8 | Baseline: run Postgres profile + `lip doctor` + `lip test` | — | 0.7 | Conformance passes against Postgres runtime | |
+| 0.9 | Fix upstream AI-doc drift (`skills/lip/*`, old gap doc) or mark them non-authoritative | — | — | Skills no longer contradict code | |
+| 0.10 | Legal pre-check: Egypt personal data law (151/2020), who is data controller (platform vs café) | — | — | Written note from counsel or explicit "deferred to Phase 5" decision | |
+
+**DoD:** PD-002/003/004/006/007 and 0.6 approved; baseline green; drift fixed.
+
+## Phase 1 — PRD v1.0 & UX
+
+| ID | Task | Closes | Depends on | Acceptance criteria | Done |
+| --- | --- | --- | --- | --- | --- |
+| 1.1 | PRD v1.0: scope, roles/permissions matrix, user stories, business rules, out-of-scope | — | M0 | Every P0 module has stories with acceptance criteria; references 04-business-rules.md | |
+| 1.2 | Customer journey (join by QR → OTP → card → earn → redeem → delete account) | G-07 | 1.1 | Flow diagram + edge cases (lost phone, wrong number, duplicate account) | |
+| 1.3 | Cashier journey (PIN login → scan → amount → confirm → redeem → undo) | G-02 G-04 G-05 | 1.1 | Each step ≤ 2 taps; works on a cheap Android phone | |
+| 1.4 | Owner onboarding (sign up → branch → program wizard → print QR) under 15 min | G-08 | 1.1 | Timed walkthrough on prototype | |
+| 1.5 | Arabic RTL design system + Figma/prototype of all P0 screens | G-14 | 1.2–1.4 | Owner approves prototype | |
+| 1.6 | Plans & limits draft (Starter/Growth/Premium: customers, branches, messages, price in EGP) | G-12 | 1.1 | Numbers approved | |
+
+**DoD:** PRD v1.0 approved; prototype approved; no open question blocks Phase 2.
+
+## Phase 2 — Foundation
+
+| ID | Task | Closes | Depends on | Acceptance criteria | Done |
+| --- | --- | --- | --- | --- | --- |
+| 2.1 | Rebrand: remove Crave/CraveUp names, ids (`crv_cus_*`), keep LICENSE/NOTICE | — | M1 | Grep finds no upstream brand in shipped code/UI | |
+| 2.2 | CI on GitHub Actions + staging environment (Postgres, LIP runtime, secrets manager) | — | 0.4 | Push to main deploys staging; tests required to merge | |
+| 2.3 | Platform customer directory above tenants (customers, memberships → member_id) | G-01 | 2.2 | One phone = one customer across cafés; café A cannot read café B's membership (RLS test) | |
+| 2.4 | Customer OTP auth integrated with BFF + OIDC verifier | G-06 | 0.3, 2.3 | Sign-in works end-to-end; tokens never reach LIP; rate limit on OTP requests | |
+| 2.5 | Cashier role: protocol write limited to accrue/redeem at own location; minimal customer view | G-05 | 2.2 | Permission tests: cashier cannot export, edit program, or act in other branch | |
+| 2.6 | Staff PIN login per branch device + device registration | G-05 | 2.5 | Lost device can be revoked by owner | |
+| 2.7 | Move platform state (profiles, events, segments, campaigns) from JSON blob to RLS tables | G-11 | 2.2 | No 100k event truncation; load test with 500 tenants × 10k customers | |
+| 2.8 | i18n + RTL infrastructure; localizable program/reward names | G-14 | 0.5 | Arabic and English render correctly; numbers/currency formatted for EGP | |
+| 2.9 | Audit log coverage for every staff/owner write | — | 2.5 | Every write has actor, branch, device, time | |
+
+**DoD:** M2 — isolation tests for all new tables pass; OTP sign-in on staging; cashier role enforced server-side.
+
+## Phase 3 — Core loyalty in the café
+
+| ID | Task | Closes | Depends on | Acceptance criteria | Done |
+| --- | --- | --- | --- | --- | --- |
+| 3.1 | Rotating member QR token (signed, single-use, ≤60 s, bound to customer+business) | G-02 | 2.3 | Replay fails; expired fails; other café's token fails | |
+| 3.2 | Bill-amount order builder → valid `FoodserviceOrder` with stable `order_id` | G-04 | 0.6 | Double-submit awards once; totals reconcile; EGP piasters | |
+| 3.3 | Staff scan flow: scan → amount → evaluate → accrue | G-02 G-04 | 3.1, 3.2, 2.6 | Stamp/points visible to customer within 2 s | |
+| 3.4 | Redemption at counter: reserve → capture, cancel → reverse | — | 3.3 | A reward can never be used twice, including two cashiers at once | |
+| 3.5 | Branch QR + pending claim queue + cashier confirm | G-03 | 3.3 | Claim never grants value until confirmed; expires after 15 min; one open claim per customer/branch | |
+| 3.6 | Undo / correction flow (staff requests, owner approves → manual adjustment) | — | 3.3, 2.9 | Classified adjustment with reason; visible in audit | |
+| 3.7 | Program wizard: stamps and points programs without JSON | G-08 | 2.8 | Owner creates "5 drinks → 1 free" in < 3 min; publishes via draft/publish | |
+| 3.8 | Anti-fraud rules v1 (scan velocity, out-of-hours, staff→same customers) | — | 3.3 | Owner alert generated in test scenarios | |
+
+**DoD:** M3 — full earn/redeem loop on staging with real phones; abuse test cases pass.
+
+## Phase 4 — Customer web app & owner dashboard (MVP)
+
+| ID | Task | Closes | Depends on | Acceptance criteria | Done |
+| --- | --- | --- | --- | --- | --- |
+| 4.1 | Customer web app (Next.js, AR/EN): my cards, progress, QR, rewards, history | G-07 | 2.4, 3.1 | Matches approved prototype; works offline-tolerant for showing QR | |
+| 4.2 | Join a café by scanning its QR; per-brand marketing consent toggle | G-07 | 4.1 | Consent stored per brand with policy version | |
+| 4.3 | Account deletion across all memberships | G-07 | 4.1 | Profile PII erased, ledger kept pseudonymous | |
+| 4.4 | Owner dashboard shell (Next.js): Overview, Customers, Programs, Transactions, Rewards, Branches, Staff, Settings | G-08 | 2.5, 3.7 | Each page uses real data; location-scoped views respected | |
+| 4.5 | Overview KPIs v1: customers, active 30d, visits, redeemed, near-reward, inactive 30d | G-13 | 2.7 | Numbers match ledger in a reconciliation test | |
+| 4.6 | Staff app as installable PWA | G-05 | 3.3 | Installs on Android/iOS home screen | |
+
+**DoD:** M4 — a non-technical person completes owner onboarding and a customer completes join → earn → redeem without help.
+
+## Phase 5 — Pilot readiness & pilot
+
+| ID | Task | Closes | Depends on | Acceptance criteria | Done |
+| --- | --- | --- | --- | --- | --- |
+| 5.1 | Security review: tenant isolation, authz, QR abuse, OTP abuse, secrets | — | M4 | Findings fixed or accepted in writing | |
+| 5.2 | Load test: peak hour in 100 cafés concurrently | — | M4 | p95 accrue < 500 ms; no duplicate awards | |
+| 5.3 | Backups + restore drill on production Postgres | — | 2.2 | Restore proven, RPO/RTO recorded | |
+| 5.4 | Privacy policy, terms, consent texts (Arabic) | — | 0.10 | Published and linked in apps | |
+| 5.5 | Manual billing for pilot cafés | G-12 | 1.6 | Invoice issued outside the app | |
+| 5.6 | Pilot in 1–3 cafés; weekly review of repeat-visit rate | — | 5.1–5.5 | 4 weeks of data; issues logged to backlog | |
+
+**DoD:** M5 — pilot cafés use it daily for 4 weeks with no data-integrity incident.
+
+## Phase 6 — Paid launch (P1)
+
+| ID | Task | Closes | Depends on | Acceptance criteria | Done |
+| --- | --- | --- | --- | --- | --- |
+| 6.1 | `KashierBillingProvider`: save token, verified webhooks | G-12 | PD-005, M5 | HMAC verified with Payment API Key; card data never stored | |
+| 6.2 | Renewal scheduler, retries, grace period, read-only on non-payment, invoice history | G-12 | 6.1 | Renewal idempotent per (subscription, period); end customers unaffected | |
+| 6.3 | Free trial, monthly/annual, upgrade/downgrade, plan limits enforced | G-12 | 6.2 | Limits enforced server-side | |
+| 6.4 | Automation engine: event triggers + "inactive N days" + birthday + near-reward + expiring | G-09 | 2.7 | Each trigger fires once per customer per rule window | |
+| 6.5 | WhatsApp Business connector (+ SMS fallback), templates, opt-out | G-10 | 6.4 | Frequency cap + send window enforced; cost counted against plan | |
+| 6.6 | Campaign attribution with holdout + retention KPIs (repeat rate, frequency, cohorts) | G-13 | 6.4 | Lift report per campaign | |
+| 6.7 | Super-admin console: businesses, plans, suspensions, usage | — | 6.3 | Operator actions audited | |
+
+**DoD:** M6 — first café pays through Kashier; automated win-back shows measurable lift vs holdout.
+
+## Phase 7 — Expansion (P2)
+
+| ID | Task | Closes | Depends on |
+| --- | --- | --- | --- |
+| 7.1 | Mobile app (React Native / Expo) + push notifications | G-15 | M6 |
+| 7.2 | Geofencing reminders | G-15 | 7.1 |
+| 7.3 | Tiers program type in wizard (Silver/Gold/Platinum) | — | M6 |
+| 7.4 | Advanced analytics | G-13 | M6 |
+| 7.5 | POS integrations (only if pilots demand it) | — | M6 |
+
+## Critical path
+
+`0.1 → 0.3 → 1.1 → 2.3 → 2.4 → 3.1 → 3.3 → 4.1 → 5.6 → 6.1 → 6.2`
+
+The biggest technical risk is **2.3 (platform identity above tenants)**; build
+and isolation-test it first in Phase 2.
+
+## Backlog (not scheduled)
+
+- Offline queue for cashier device when internet drops
+- Item-level purchases / product exclusions (if 0.6 chose amount-only)
+- Referral program, gamification
+- Franchise funding settlement

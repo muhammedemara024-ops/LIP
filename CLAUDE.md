@@ -2,6 +2,8 @@
 
 Context for Claude (Claude Code and Claude Projects) working in this repository.
 Read this file first, then `docs/context/README.md`.
+Before starting any task, find it in `docs/context/06-roadmap.md`; do not work on
+tasks whose phase gate is closed or that depend on a Proposed decision.
 
 ## What this repository is
 

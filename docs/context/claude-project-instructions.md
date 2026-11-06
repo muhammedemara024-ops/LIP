@@ -10,6 +10,7 @@ Context files in this Project (read before answering):
 - 03-gap-analysis.md — what LIP already provides and what we must build
 - 04-business-rules.md — invariants for money, QR, transactions, messaging, tenancy
 - 05-glossary.md — Arabic ↔ English ↔ code terms
+- 06-roadmap.md — phases and tasks; only work on tasks whose phase gate is open
 
 How to work:
 1. Reply in Egyptian Arabic; keep code, identifiers, table names and technical
