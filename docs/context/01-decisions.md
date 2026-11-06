@@ -116,7 +116,7 @@ and patterns, write our own engine":
 
 Date / approved by: 2026-11-06, project owner.
 
-## PD-003 — Staff confirmation is the only path that grants purchase value — Approved (2026-11-06)
+## PD-003 — Staff confirmation is the only path that grants purchase value — Approved (2026-11-06); amended 2026-11-06 (A1: device-bound member QR)
 
 Context: the approved brief requires two capture methods: Method A (customer
 scans the branch QR) and Method B (staff scans the customer's rotating QR).
@@ -167,11 +167,37 @@ Consequences:
 *Offline*
 - No value is granted offline in the MVP: the Method B token is server-signed,
   single-use and ≤ 60 s, so it can only be validated online. The staff app
-  says so clearly.
+  says so clearly. *(Token wording amended by A1 below: "server-signed" →
+  "server-verifiable, device-bound". Validation still happens online.)*
 - Purchases made during an outage are never awarded retroactively by the
   cashier. The owner may afterwards post a classified `service_recovery`
   manual adjustment with a reason; it is audited.
 - The offline queue stays in the backlog.
+
+Date / approved by: 2026-11-06, project owner.
+
+### Amendment A1 — 2026-11-06: device-bound member QR (offline display)
+
+Context: roadmap task 4.1 requires the customer app to show the member QR
+offline (café interiors often have weak signal), but a server-signed token
+needs the customer's phone to be online. Raised in PD-004 round 1 (Q5).
+
+Decision: the Method B member QR changes from **"server-signed"** to
+**"server-verifiable, device-bound"**. At sign-in each customer device receives
+a device secret; the app derives a rotating code (≤ 60 s) from it, even
+offline. The server verifies each code.
+
+Consequences:
+- Each code is single-use on the server and bound to {customer, device}; it
+  stays bound to the business whose card is shown, as before (task 3.1:
+  another café's code fails).
+- At most 3 active devices per customer; the customer can see and revoke them.
+- The device secret is rotated every time the app is online.
+- Offline display requires the app to have been opened online at least once on
+  that device (installed PWA with a service worker).
+- Unchanged: the staff side must be online, validation happens on the server,
+  and no value is granted offline.
+- Changing the phone number (PD-004) revokes every session and device secret.
 
 Date / approved by: 2026-11-06, project owner.
 

@@ -60,8 +60,15 @@ At the counter:
   the owner may post a classified `service_recovery` adjustment with a reason.
 
 Method B — staff scans customer QR (trusted path):
-- Token is server-signed, single-use, bound to {customer, business}, TTL ≤ 60 s,
-  refreshed in the app automatically.
+- Code is **server-verifiable, device-bound** (amended 2026-11-06, PD-003 A1;
+  was "server-signed"): derived on the customer's device from a device secret,
+  rotating with TTL ≤ 60 s, works offline on the customer side.
+- MUST: each code is single-use on the server and bound to {customer, device}
+  and to the business whose card is shown.
+- MUST: at most 3 active devices per customer; the customer can see and revoke
+  them. The device secret is rotated every time the app is online.
+- Offline display requires the app to have been opened online at least once on
+  that device (installed PWA with a service worker).
 - Replay of a consumed token MUST fail with a clear error, not a silent success.
 
 Method A — customer scans branch QR (convenience path):

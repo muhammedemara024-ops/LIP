@@ -36,6 +36,10 @@ LIP **قلب ولاء ممتاز ومضبوط هندسياً** (Ledger ثابت�
 المقترح: خدمة Customer Directory عندنا (جدول عملاء على مستوى المنصة + جدول عضويات)، وLIP يفضل شايف `member_id` بس. الكافيه ما يشوفش أي عضوية تانية للعميل.
 
 ### G-02 · QR متغير للعميل يمسحه الكاشير — P0 — غير موجود
+
+> Update 2026-11-06 (PD-003 A1): the code is server-verifiable and
+> device-bound (derived on the customer's device, works offline), not
+> server-signed. See 01-decisions.md.
 LIP فيه QR للمكافأة المُصدرة بس (bearer code ثابت). مفيش QR عضوية متجدد.
 المطلوب: توكن قصير العمر (مثلاً 30–60 ثانية) موقّع من السيرفر، استخدام مرة واحدة، مربوط بالعضوية والكافيه، ويتسجل في Audit مين مسحه ومن أي فرع.
 
