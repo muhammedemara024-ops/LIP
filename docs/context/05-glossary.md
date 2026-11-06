@@ -28,4 +28,11 @@
 | النسخة المثبّتة | Pinned commit | the exact upstream commit our fork is based on (PD-002) |
 | تعديل على الـ fork | Fork patch | any change we make to upstream code; never to `/lip/v1` semantics or `spec/` |
 | قلب الولاء | Loyalty core | the LIP parts we ship: protocol, engine, storage, identity, SDK, Cloud |
+| مسح الكاشير لـ QR العميل | Staff scan (Method B) | ours (G-02); the trusted path that grants purchase value directly |
+| مسح العميل لـ QR الفرع | Customer scan (Method A) | ours (G-03); creates a pending claim only |
+| QR العضوية المتغير | Member QR token | ours: short-lived, single-use code identifying one customer at one business |
+| عملية معلّقة | Pending claim | ours: a customer's request for purchase credit, worth nothing until staff confirm it |
+| كود التأكيد | Claim code | short code on the customer's phone that the cashier types to confirm a pending claim |
+| جلسة الموظف | Staff session | a signed-in staff member on a registered branch device; the only actor that grants purchase value |
+| تعويض الخدمة | Service recovery adjustment | owner-only manual adjustment classified `service_recovery` (e.g. purchases lost to an outage) |
 | مرجع | Reference package | an upstream part we read but do not ship (e.g. upstream Admin, wallet) |

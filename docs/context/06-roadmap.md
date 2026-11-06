@@ -35,7 +35,7 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
 | ID | Task | Closes | Depends on | Acceptance criteria | Done |
 | --- | --- | --- | --- | --- | --- |
 | 0.1 | Decide PD-002: adopt LIP as loyalty core (fork + pin upstream `8ad93c8`) | — | — | PD-002 Approved or Superseded in 01-decisions.md | 2026-11-06 — Approved, conditional on 0.7 + 0.8 |
-| 0.2 | Decide PD-003: staff scan is the only path that grants value | — | — | PD-003 Approved | |
+| 0.2 | Decide PD-003: staff scan is the only path that grants value | — | — | PD-003 Approved | 2026-11-06 — Approved |
 | 0.3 | Decide PD-004: customer OTP provider + channel (SMS/WhatsApp) | G-06 | — | Provider chosen; confirmed it issues JWKS-verifiable JWTs; Egyptian delivery tested with one real number | |
 | 0.4 | Decide PD-006: hosting (Next.js on Vercel, LIP runtime on container host, Postgres provider) | — | 0.1 | Approved; region chosen; monthly cost estimate written | |
 | 0.5 | Decide PD-007: Arabic-first, English second | G-14 | — | Approved | |
@@ -71,7 +71,7 @@ application code is written.
 | 2.2 | CI on GitHub Actions + staging environment (Postgres, LIP runtime, secrets manager) | — | 0.4 | Push to main deploys staging; tests required to merge | |
 | 2.3 | Platform customer directory above tenants (customers, memberships → member_id) | G-01 | 2.2 | One phone = one customer across cafés; café A cannot read café B's membership (RLS test) | |
 | 2.4 | Customer OTP auth integrated with BFF + OIDC verifier | G-06 | 0.3, 2.3 | Sign-in works end-to-end; tokens never reach LIP; rate limit on OTP requests | |
-| 2.5 | Cashier role: protocol write limited to accrue/redeem at own location; minimal customer view | G-05 | 2.2 | Permission tests: cashier cannot export, edit program, or act in other branch | |
+| 2.5 | Cashier role: protocol write limited to accrue/redeem at own location; minimal customer view | G-05 | 2.2 | Permission tests: cashier cannot export, edit program, post manual adjustments, or act in other branch; staff phone OTP-verified at creation, change needs owner approval | |
 | 2.6 | Staff PIN login per branch device + device registration | G-05 | 2.5 | Lost device can be revoked by owner | |
 | 2.7 | Move platform state (profiles, events, segments, campaigns) from JSON blob to RLS tables; make the platform layer multi-instance-safe | G-11 | 2.2 | Platform state lives in revisioned rows; no 100k event truncation; every scheduler (campaign, engagement, membership) and the webhook dispatcher run under `withLease()`; a test starts two instances and proves a due campaign runs exactly once; load test with 500 tenants × 10k customers | |
 | 2.8 | i18n + RTL infrastructure; localizable program/reward names | G-14 | 0.5 | Arabic and English render correctly; numbers/currency formatted for EGP | |
@@ -85,9 +85,9 @@ application code is written.
 | --- | --- | --- | --- | --- | --- |
 | 3.1 | Rotating member QR token (signed, single-use, ≤60 s, bound to customer+business) | G-02 | 2.3 | Replay fails; expired fails; other café's token fails | |
 | 3.2 | Bill-amount order builder → valid `FoodserviceOrder` with stable `order_id` | G-04 | 0.6 | Double-submit awards once; totals reconcile; EGP piasters | |
-| 3.3 | Staff scan flow: scan → amount → evaluate → accrue | G-02 G-04 | 3.1, 3.2, 2.6 | Stamp/points visible to customer within 2 s | |
-| 3.4 | Redemption at counter: reserve → capture, cancel → reverse | — | 3.3 | A reward can never be used twice, including two cashiers at once | |
-| 3.5 | Branch QR + pending claim queue + cashier confirm | G-03 | 3.3 | Claim never grants value until confirmed; expires after 15 min; one open claim per customer/branch | |
+| 3.3 | Staff scan flow: scan → amount → evaluate → accrue | G-02 G-04 | 3.1, 3.2, 2.6 | Stamp/points visible to customer within 2 s; staff cannot award to own customer account; offline shows clear error and awards nothing | |
+| 3.4 | Redemption at counter: reserve → capture, cancel → reverse | — | 3.3 | A reward can never be used twice, including two cashiers at once; customer app cannot reserve or capture | |
+| 3.5 | Branch QR + pending claim queue + cashier confirm | G-03 | 3.3 | Claim never grants value until confirmed; cashier must type the claim code (unique among open claims at the branch); wrong code rejected, 3 wrong codes cancel the claim; expires after 15 min; one open claim per customer/branch | |
 | 3.6 | Undo / correction flow (staff requests, owner approves → manual adjustment) | — | 3.3, 2.9 | Classified adjustment with reason; visible in audit | |
 | 3.7 | Program wizard: stamps and points programs without JSON | G-08 | 2.8 | Owner creates "5 drinks → 1 free" in < 3 min; publishes via draft/publish | |
 | 3.8 | Anti-fraud rules v1 (scan velocity, out-of-hours, staff→same customers) | — | 3.3 | Owner alert generated in test scenarios | |
@@ -154,6 +154,7 @@ and isolation-test it first in Phase 2.
 ## Backlog (not scheduled)
 
 - Offline queue for cashier device when internet drops
+- Counter lookup by phone number (with OTP to the customer) when the QR cannot be scanned (PD-003)
 - Item-level purchases / product exclusions (if 0.6 chose amount-only)
 - Referral program, gamification
 - Franchise funding settlement

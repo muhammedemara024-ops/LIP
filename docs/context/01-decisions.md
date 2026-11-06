@@ -116,11 +116,64 @@ and patterns, write our own engine":
 
 Date / approved by: 2026-11-06, project owner.
 
-## PD-003 — Staff Scan is the trusted path — Proposed (recommended in brief)
+## PD-003 — Staff confirmation is the only path that grants purchase value — Approved (2026-11-06)
 
-Method B (staff scans rotating customer QR) is the only path that can grant
-value directly. Method A (customer scans branch QR) creates a *pending* claim
-that a staff member must confirm.
+Context: the approved brief requires two capture methods: Method A (customer
+scans the branch QR) and Method B (staff scans the customer's rotating QR).
+The customer's phone is untrusted; the staff member is the only party who sees
+the purchase happen.
+
+Decision: purchase accrual and counter redemption run only from an
+authenticated staff session of the business at an allowed branch. Method B
+(staff scan) grants value directly. Method A creates a pending claim that grants
+nothing until a staff member confirms it.
+
+Consequences:
+
+*Scope*
+- PD-003 covers purchase accrual and counter redemption only.
+- Every non-purchase source of value — manual adjustment, campaign reward,
+  automation reward (welcome, birthday, …), balance import — is outside PD-003:
+  it is authorized by the owner or the system, classified, audited, and carries
+  a stable business id so it is idempotent.
+- Manual adjustments are owner-only; the cashier cap stays at 0.
+
+*Redemption*
+- The customer never reserves or captures. The "Redeem" button in the customer
+  app only displays the reward QR (including issued rewards); reserve → capture
+  runs from a staff session.
+
+*Method A — pending claims*
+- The customer's phone shows their first name and a short claim code, unique
+  among open claims at that branch.
+- The cashier must **type** the code; there is no pick-from-a-list
+  confirmation. A wrong code is rejected; repeated wrong codes on the same claim
+  cancel it (default 3 attempts — proposed starting value).
+- The staff member always enters the bill amount; the customer never does.
+- Claims expire (default 15 min); one open claim per customer per branch.
+
+*No manual lookup*
+- The cashier cannot find a customer by typing a phone number (MVP). If the
+  customer QR cannot be scanned, the fallback is Method A, or no award.
+  Phone lookup (possibly with an OTP to the customer) is in the backlog.
+
+*Staff self-dealing*
+- A staff profile stores the staff member's phone number, OTP-verified when the
+  profile is created; changing it requires owner approval.
+- A staff session cannot award, confirm a claim, or redeem for the customer
+  account with that phone number. The owner can, with an audit record.
+- Collusion beyond that is handled by the anomaly alerts in 04-business-rules.
+
+*Offline*
+- No value is granted offline in the MVP: the Method B token is server-signed,
+  single-use and ≤ 60 s, so it can only be validated online. The staff app
+  says so clearly.
+- Purchases made during an outage are never awarded retroactively by the
+  cashier. The owner may afterwards post a classified `service_recovery`
+  manual adjustment with a reason; it is audited.
+- The offline queue stays in the backlog.
+
+Date / approved by: 2026-11-06, project owner.
 
 ## PD-004 — Customer authentication: phone OTP — Proposed
 

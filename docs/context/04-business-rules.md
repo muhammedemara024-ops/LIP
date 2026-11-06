@@ -43,18 +43,34 @@ reimplement them, call LIP. Rules marked (OURS) must be built in our layer.
 - (OURS) A "bill amount only" purchase becomes one synthetic order line marked
   loyalty-eligible; the BFF owns `order_id` generation per scan session.
 
-## QR flows (OURS)
+## QR flows (OURS, PD-003)
+
+At the counter:
+- MUST: purchase accrual and counter redemption run only from an authenticated
+  staff session of the same business at an allowed branch; record staff id,
+  device id, branch id.
+- MUST: the staff member enters the bill amount; the customer never does.
+- MUST: no cashier lookup of a customer by phone number (MVP). If the customer
+  QR cannot be scanned, the fallback is Method A, or no award.
+- MUST: the customer app never reserves or captures a reward. Its "Redeem"
+  button only displays the reward QR (including issued rewards); reserve →
+  capture runs from a staff session.
+- MUST: no value is granted offline; the staff app shows a clear error.
+  Purchases made during an outage are never awarded retroactively by staff;
+  the owner may post a classified `service_recovery` adjustment with a reason.
 
 Method B — staff scans customer QR (trusted path):
 - Token is server-signed, single-use, bound to {customer, business}, TTL ≤ 60 s,
   refreshed in the app automatically.
-- Scan is valid only by an authenticated staff session of the same business and
-  an allowed branch; record staff id, device id, branch id.
 - Replay of a consumed token MUST fail with a clear error, not a silent success.
 
 Method A — customer scans branch QR (convenience path):
 - Creates a *pending claim* only; no value is granted until a staff member of
-  that branch confirms and enters the bill amount.
+  that branch confirms it and enters the bill amount.
+- The customer's phone shows their first name and a claim code, unique among
+  open claims at that branch.
+- MUST: the cashier confirms by **typing** the claim code; no pick-from-a-list.
+  A wrong code is rejected; repeated wrong codes cancel the claim (default 3).
 - Pending claims expire (default 15 min). One open claim per customer per branch.
 - Branch QR codes are rotatable by the owner if leaked.
 
@@ -70,7 +86,14 @@ Method A — customer scans branch QR (convenience path):
 
 - Cashier role: record purchase, redeem reward, view customer first name +
   card progress. No export, no program edits, no other branches.
-- Daily cap on manual adjustments per staff member (default 0 for cashiers).
+- MUST: manual adjustments are owner-only; the cashier cap is 0. (PD-003)
+- MUST: every non-purchase source of value (manual adjustment, campaign,
+  automation, import) carries a stable business id and is idempotent. (PD-003)
+- MUST: a staff profile's phone number is OTP-verified at creation; changing it
+  requires owner approval. (PD-003)
+- MUST: a staff session cannot award, confirm a claim, or redeem for the
+  customer account with the staff member's own phone number; the owner can,
+  with an audit record. (PD-003)
 - Owner alert on anomalies: many scans of the same customer in a short window,
   scans outside opening hours, a staff member awarding to the same few customers.
 
