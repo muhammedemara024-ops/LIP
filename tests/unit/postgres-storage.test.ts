@@ -5,7 +5,9 @@ import { LoyaltyEngine } from "@loyalty-interchange/reference";
 import {
   PostgresEngineRepository,
   PostgresJsonStateStore,
-  assertSessionLeaseCompatibleUrl
+  PostgresMigrator,
+  assertSessionLeaseCompatibleUrl,
+  createPostgresPool
 } from "@loyalty-interchange/storage-postgres";
 import { StateRevisionConflictError } from "@loyalty-interchange/storage";
 import { makeEnroll, makeProgram, sequentialIds } from "../fixtures.js";
@@ -107,6 +109,35 @@ postgresDescribe("Postgres storage integration", () => {
     } finally {
       await first.clear();
       await Promise.all([first.close(), second.close()]);
+    }
+  }, 90_000);
+
+  it("serializes concurrent cold-start migrations on a fresh schema without catalog collisions", async () => {
+    const schema = `cold_start_${randomUUID().replace(/-/g, "_")}`;
+    const adminPool = createPostgresPool({ connectionString: postgresUrl! });
+    const workerCount = 8;
+    const pools = Array.from({ length: workerCount }, () =>
+      createPostgresPool({
+        connectionString: postgresUrl!,
+        poolConfig: { max: 2, options: `-c search_path=${schema}` }
+      })
+    );
+    try {
+      await adminPool.query(`CREATE SCHEMA ${schema}`);
+      await Promise.all(pools.map((pool) => pool.query("SELECT 1")));
+      await Promise.all(pools.map((pool) => new PostgresMigrator(pool).migrate()));
+      const versions = await adminPool.query<{ version: number; name: string }>(
+        `SELECT version, name FROM ${schema}.lip_schema_migrations ORDER BY version`
+      );
+      expect(versions.rows).toEqual([
+        { version: 1, name: "normalized_engine" },
+        { version: 2, name: "tenant_isolation" },
+        { version: 3, name: "tenant_runtime_role" }
+      ]);
+    } finally {
+      await Promise.all(pools.map((pool) => pool.end()));
+      await adminPool.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+      await adminPool.end();
     }
   }, 90_000);
 });

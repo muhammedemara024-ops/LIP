@@ -140,11 +140,13 @@ and never queues behind accruals or redemptions.
   or a `withLease`-guarded singleton dispatcher — tracked as follow-up work.
 </Warning>
 
-The managed Render blueprint enforces the singleton constraint with separate
-sandbox and production services, independent Neon databases and roles,
-environment-specific disks, and `numInstances: 1`. Deployment, backup/restore,
-and rollback procedures are recorded in the repository's managed-environment
-release runbook.
+The managed Render blueprint (`render.yaml`) enforces the singleton constraint
+with three independent diskless services (`development`, `sandbox`, and
+`production`), separate PostgreSQL databases and roles,
+`LIP_CLOUD_PUBLIC_BASE_URL` (no attached persistent disk — all durable state
+lives in PostgreSQL), and `numInstances: 1`. Deployment, backup/restore, and
+rollback procedures are recorded in the repository's diskless managed runtime
+and managed-environment release runbooks.
 
 ## Integration test
 

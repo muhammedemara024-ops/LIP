@@ -34,9 +34,9 @@ Read [`llms.txt`](../../llms.txt) first. When docs and `spec/` disagree, `spec/`
 - `/lip-bff` — customer app pattern (BFF reference)
 - `/lip-conformance` — doctor, test, validate
 
-## Pitfalls (do not implement against LIP directly)
+## Pitfalls (do not implement against `/lip/v1` core directly)
 
-- Customer OTP, social login, or sessions
-- Campaigns, segments, push, CRM
-- Runtime program editing (boot-time `--program` only today)
+- Customer OTP, social login, or sessions (keep in your BFF; see `docs/context/01-decisions.md` PD-004 for our BFF-owned WhatsApp/SMS OTP flow)
+- Campaigns, segments, CRM, or messaging inside `/lip/v1` (the reference platform exposes these outside `/lip/v1` under `/platform/v1/*` and `/admin/api/v1/*`)
+- Program editing on `/lip/v1` (`/lip/v1/programs/get` is read-only; runtime program draft, validation, publish, and rollback live on `/admin/api/v1/program/*`, in addition to boot-time `--program`)
 - Client-side points math when `orders/evaluate` is available

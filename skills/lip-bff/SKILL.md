@@ -29,7 +29,13 @@ identity and store the returned `member_id`. Do not send raw JWTs, email
 addresses, phone numbers, or provider subjects to `/lip/v1`.
 
 `@loyalty-interchange/identity` supplies the OIDC verifier, mapping contract,
-and resolver. It intentionally does not wrap provider authentication APIs.
+and resolver for upstream OIDC integrations. It intentionally does not wrap
+provider authentication APIs.
+
+> **Project note (PD-004):** In our Egypt SaaS platform (`docs/context/01-decisions.md`),
+> customer sign-in is run directly by our BFF using phone OTP (WhatsApp Cloud API +
+> Egyptian SMS) mapped through the platform customer directory to a per-tenant opaque
+> `member_id`, rather than an external OIDC provider.
 
 ## Cart preview
 

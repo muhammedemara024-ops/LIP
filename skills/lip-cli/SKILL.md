@@ -21,7 +21,11 @@ npm run lip -- schemas
 
 ## Custom program + webhooks
 
+`LIP_WEBHOOK_SECRET` must be at least 16 characters. Non-HTTPS or loopback/private
+webhook targets require `LIP_ALLOW_PRIVATE_WEBHOOK_NETWORKS=true` in local development:
+
 ```bash
+LIP_ALLOW_PRIVATE_WEBHOOK_NETWORKS=true \
 LIP_WEBHOOK_URL=http://127.0.0.1:8787/loyalty/webhook \
 LIP_WEBHOOK_SECRET=your-shared-secret \
 npm run lip -- serve --program ./my-program.json --api-key lip-dev-key

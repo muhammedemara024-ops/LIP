@@ -13,6 +13,9 @@ The reference platform emits signed CloudEvents after mutations. Profile:
 
 ## Enable delivery
 
+`LIP_WEBHOOK_SECRET` must contain at least 16 characters (for local `http://127.0.0.1`
+receivers, also set `LIP_ALLOW_PRIVATE_WEBHOOK_NETWORKS=true`):
+
 ```bash
 LIP_WEBHOOK_URL=https://your-app/loyalty/webhook \
 LIP_WEBHOOK_SECRET=your-shared-secret \
@@ -48,6 +51,7 @@ Deduplicate on CloudEvent `source` + `id` (idempotent replays reuse resource ids
 - `org.loyalty-interchange.issued-reward.redeemed.v1`
 - `org.loyalty-interchange.issued-reward.restored.v1`
 - `org.loyalty-interchange.issued-reward.cancelled.v1`
+- `org.loyalty-interchange.balance.changed.v1`
 
 ## Reference
 

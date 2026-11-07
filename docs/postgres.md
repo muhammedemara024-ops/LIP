@@ -103,10 +103,14 @@ counted in the report but not persisted until the next real write commits.
 > instance Admin/webhook serving needs per-delivery revisioned rows or a
 > `withLease`-guarded singleton dispatcher — tracked as follow-up work.
 
-The managed Render blueprint enforces this with two independent services,
-separate Neon databases/roles, attached environment-specific disks, and
-`numInstances: 1`. See
-[`docs/runbooks/managed-environment-release.md`](runbooks/managed-environment-release.md).
+The upstream managed Render blueprint (`render.yaml`) enforces this with three
+independent diskless services (`development`, `sandbox`, and `production`),
+separate PostgreSQL databases/roles, `LIP_CLOUD_PUBLIC_BASE_URL` (no attached
+persistent disk — all durable state lives in PostgreSQL), and `numInstances: 1`.
+See [`docs/runbooks/diskless-managed-runtime.md`](runbooks/diskless-managed-runtime.md)
+and [`docs/runbooks/managed-environment-release.md`](runbooks/managed-environment-release.md)
+(for our Egypt SaaS target deployment on Render Frankfurt + Render Postgres,
+see `docs/context/01-decisions.md` PD-006).
 
 ## Integration test
 

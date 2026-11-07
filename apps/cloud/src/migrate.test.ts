@@ -60,4 +60,36 @@ describe.skipIf(!postgresUrl)("runSharedClusterMigrations against Postgres", () 
       await client.end();
     }
   }, 90_000);
+
+  it("serializes concurrent cold-start control-plane and customer migrations on a fresh schema", async () => {
+    const { randomUUID } = await import("node:crypto");
+    const { Pool } = await import("pg");
+    const { PostgresCloudRepository } = await import("./postgres-repository.js");
+    const { PostgresCustomerRepository } = await import("./customer-postgres-repository.js");
+    const schema = `cloud_cold_start_${randomUUID().replace(/-/g, "_")}`;
+    const adminPool = new Pool({ connectionString: postgresUrl! });
+    const cloudPools = Array.from({ length: 4 }, () =>
+      new Pool({ connectionString: postgresUrl!, max: 2, options: `-c search_path=${schema}` })
+    );
+    const customerPools = Array.from({ length: 4 }, () =>
+      new Pool({ connectionString: postgresUrl!, max: 2, options: `-c search_path=${schema}` })
+    );
+    const allPools = [...cloudPools, ...customerPools];
+    try {
+      await adminPool.query(`CREATE SCHEMA ${schema}`);
+      await Promise.all(allPools.map((pool) => pool.query("SELECT 1")));
+      await Promise.all([
+        ...cloudPools.map((pool) => new PostgresCloudRepository({ pool }).migrate()),
+        ...customerPools.map((pool) => new PostgresCustomerRepository({ pool }).migrate())
+      ]);
+      const cloudVersions = await adminPool.query<{ version: number }>(
+        `SELECT version FROM ${schema}.lip_cloud_schema_migrations ORDER BY version`
+      );
+      expect(cloudVersions.rows.map((row) => row.version)).toEqual([1, 2, 3, 4, 5, 6]);
+    } finally {
+      await Promise.all(allPools.map((pool) => pool.end()));
+      await adminPool.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+      await adminPool.end();
+    }
+  }, 90_000);
 });

@@ -1,5 +1,18 @@
 # API and documentation gap analysis
 
+> [!NOTE]
+> **Historical snapshot (July 15, 2026 — non-authoritative for current capabilities).**
+> Many platform and operator capabilities listed as missing below have since shipped in
+> v0.2.0 (`POST /lip/v1/ledger/manual-adjustments` making 19 `/lip/v1` operations in
+> `spec/openapi.yaml`; 18 `/platform/v1` operations in `spec/platform-openapi.yaml`
+> for members, events, segments, campaigns, connectors, analytics, and CSV imports; and
+> 36 `/admin/api/v1/*` routes for program draft/validate/publish/rollback, templates,
+> locations, RBAC/API keys/audit, and webhook subscription CRUD/rotation/replay).
+> For the authoritative current architecture and product gaps, see
+> [`docs/reference-platform.md`](reference-platform.md),
+> [`docs/platform-api.md`](platform-api.md), and
+> [`docs/context/03-gap-analysis.md`](context/03-gap-analysis.md).
+
 Compared on July 15, 2026 against:
 
 - OpenLoyalty API docs: `https://apidocs.openloyalty.io/`

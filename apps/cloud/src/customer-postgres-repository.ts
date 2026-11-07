@@ -127,6 +127,10 @@ export class PostgresCustomerRepository implements CustomerRepository {
       "utf8"
     );
     await transaction(this.pool, async (client) => {
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        ["lip:cloud:schema-migrations"]
+      );
       await client.query(`
         CREATE TABLE IF NOT EXISTS lip_cloud_schema_migrations (
           version INTEGER PRIMARY KEY,
@@ -134,10 +138,6 @@ export class PostgresCustomerRepository implements CustomerRepository {
           applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
       `);
-      await client.query(
-        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-        ["lip:cloud:schema-migrations"]
-      );
       const applied = await client.query(
         "SELECT 1 FROM lip_cloud_schema_migrations WHERE version = 3"
       );
