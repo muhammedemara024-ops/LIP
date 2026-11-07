@@ -114,5 +114,4 @@ Mapping of our product modules → LIP constructs: `docs/context/02-lip-architec
   idempotency/tenant code.
 - Before touching money, balances, reservations or RLS: re-read the relevant
   section of `docs/context/04-business-rules.md` and the spec.
-- Respond to the human in Egyptian Arabic unless asked otherwise; keep code,
-  identifiers, commits and docs in English.
+- Respond to the human in English.

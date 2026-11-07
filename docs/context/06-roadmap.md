@@ -40,13 +40,58 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
 | 0.4 | Decide PD-006: hosting (LIP, BFF and one Next.js app on a container host in Frankfurt; Postgres provider) | — | 0.1 | Approved; region chosen; per-service monthly cost table ≤ $100 for staging + production | 2026-11-06 — Approved (Render Frankfurt, Pro workspace, Render Postgres), conditional |
 | 0.5 | Decide PD-007: Arabic-first, English second | G-14 | — | Approved | 2026-11-06 — Approved |
 | 0.6 | New decision: purchase capture = bill amount only vs items | G-04 | 0.2 | Decision recorded with its effect on product exclusions | 2026-11-06 — Approved as PD-008 (bill amount only) |
-| 0.7 | Baseline: `npm ci && npm run typecheck && npm test` on Node 22 | — | — | All green, result + Node version recorded here | |
-| 0.8 | Baseline: run Postgres profile + `lip doctor` + `lip test` | — | 0.7 | Conformance passes against Postgres runtime; idle memory of the LIP process recorded (sizes the instance, PD-006) | |
+| 0.7 | Baseline: `npm ci && npm run typecheck && npm test` on Node 22 | — | — | All green, result + Node version recorded here | 2026-11-07 — Passed on Linux (`node:22.22.0`, npm `10.9.4`): 62/62 files, 479/479 tests, 0 failed, 0 skipped (Windows informational run: 450 passed, 6 failed, 23 skipped) |
+| 0.8 | Baseline: run Postgres profile + `lip doctor` + `lip test` | — | 0.7 | Conformance passes against Postgres runtime; idle memory of the LIP process recorded (sizes the instance, PD-006) | 2026-11-07 — Passed (`lip doctor` PASS 3/3, `lip test` PASS 5/5 against `lip-postgres`); idle memory: 27.71 MiB container cgroup / 87,780 kB (~85.7 MiB) `VmRSS` (fits PD-006 512 MB instance) |
 | 0.9 | Fix upstream AI-doc drift (`skills/lip/*`, old gap doc) or mark them non-authoritative; resolve `docs/postgres.md` "attached environment-specific disks" vs diskless `render.yaml` + release runbook | — | — | Skills and docs no longer contradict code | |
 | 0.10 | Legal pre-check: Egypt personal data law (151/2020), who is data controller (platform vs café) | — | — | Hard gate before the pilot (PD-006): written opinion from Egyptian counsel on whether hosting personal data in Frankfurt needs a PDPC permit and how to get it, or a permit application filed. Legal facts in PD-006 are unverified (secondary sources). If data must stay in Egypt, PD-006 reopens | |
 | 0.11 | Legal entity: company commercial registration | — | — | Registration issued; blocks SMS sender-ID registration, Meta Business verification, WhatsApp authentication-template approval, the real-number test in 2.4, and the pilot (5.6) | |
+| 0.12 | Dependency audit (`npm audit --omit=dev`) | — | 0.7 | Record total production vulnerabilities, critical + high packages, and prod vs dev breakdown; mandatory gate before 5.6 (Pilot) | 2026-11-07 — Recorded: 9 production vulnerabilities (1 critical: `proxy-addr`; 4 high: `@modelcontextprotocol/sdk`, `body-parser`, `fast-uri`, `zod`; 4 moderate: `@hono/node-server`, `hono`, `ip-address`, `qs`) + 10 dev-only (19 total) |
 
 **DoD:** PD-002/003/004/006/007 and 0.6 approved; baseline green; drift fixed.
+
+### Phase 0 Baseline & Audit Records (Tasks 0.7, 0.8, 0.12)
+
+#### Windows run (Task 0.7 — informational only)
+- **Result:** 450 passed, 6 Windows-specific failures, 23 skipped (479 total across 62 test files).
+- **Windows-specific failures (6):** POSIX `chmod` file-permission assertion (`0o600` no-op on NTFS), SQLite `EBUSY` locked-file temp directory cleanup on Windows, and Windows `spawn npm ENOENT` executable resolution without `.cmd` shell wrapper.
+- **Skipped tests (23):** All 23 skipped tests were PostgreSQL-gated suites (`LIP_TEST_POSTGRES_URL` unset during the host run).
+- **Status:** Informational only — not a deployment blocker (Linux is the target deployment environment per PD-006).
+
+#### Official Linux run (Task 0.7 — Docker `node:22.22.0` + `postgres:17-alpine`)
+- **Node version:** `v22.22.0` (matches `.nvmrc`)
+- **npm version:** `10.9.4`
+- **Installation (`npm ci`):** Succeeded (`added 310 packages, and audited 325 packages in 50s`).
+- **Typecheck (`npm run typecheck`):** Succeeded (`tsc -b --pretty false && npm run typecheck --workspace @loyalty-interchange/admin`, exit code `0`).
+- **Test totals (`npm test` / `vitest run`):** 62 test files passed (62 total) | **479 total tests** | **479 passed** | **0 failed** | **0 skipped** (`9.28s`).
+- **Skipped tests and explanations:** **0 skipped.** Configuring `LIP_TEST_POSTGRES_URL=postgres://loyalty:lip-local-password@postgres:5432/loyalty` against the disposable `compose.yaml` PostgreSQL 17 service enabled all 23 previously skipped PostgreSQL-gated tests across 8 test files (`tests/unit/tenant-isolation-live.test.ts` [11], `tests/unit/postgres-storage.test.ts` [1], `tests/conformance/postgres-lease-conformance.test.ts` [2], `tests/unit/location-report-read-path.test.ts` [2], `tests/unit/postgres-platform.test.ts` [2], `apps/cloud/src/cloud.test.ts` [1], `apps/cloud/src/migrate.test.ts` [3], `apps/cloud/src/operator-auth.test.ts` [1]).
+- **Explicit tenant-isolation & lease verification:**
+  1. `tenant-isolation-live` (`tests/unit/tenant-isolation-live.test.ts`): **11/11 passed** (`1124ms`) — verified live PostgreSQL RLS isolation across tenants for members, accounts, rewards, orders, redemptions, ledger entries, reservations, idempotency records, and `/platform/v1` state.
+  2. Storage PostgreSQL tenant-isolation (`packages/storage-postgres/src/tenant-isolation.test.ts` + `tests/unit/postgres-storage.test.ts`): **11/11 passed** (`366ms`) and **5/5 passed** (`559ms`, including live `Postgres storage integration > migrates, round-trips normalized engine state, coordinates mutations, and leases`).
+  3. `postgres-lease-conformance` (`tests/conformance/postgres-lease-conformance.test.ts`): **2/2 passed** (`181ms`) — verified `PostgresStorageAdapter.withLease` mutual exclusion and overlap prevention on live PostgreSQL.
+- *Operational note:* `PostgresMigrator.migrate()` executes `CREATE TABLE IF NOT EXISTS lip_schema_migrations` before acquiring its transaction advisory lock (`lockTransaction(client, "lip:schema-migrations")`), which can trigger a PostgreSQL catalog race (`pg_type_typname_nsp_index`) if multiple Vitest workers connect simultaneously to a brand-new unmigrated database before the first migration completes.
+
+#### Official Linux runtime & memory verification (Task 0.8)
+- **PostgreSQL profile verification:** `docker compose --profile postgres up -d --build` built and started `postgres` (`postgres:17-alpine`, healthy), `lip-postgres` (`node:22-alpine`, healthy on `127.0.0.1:3211->3210/tcp`), `lip` (SQLite profile, healthy on `127.0.0.1:3210->3210/tcp`), and `wallet` (healthy on `127.0.0.1:3230->3230/tcp`).
+- **`lip doctor` result (against `lip-postgres`):** **PASS** (3/3 checks passed: `discovery: LIP 1.0 foodservice discovery is valid`, `health: server reports healthy`, `authentication and capabilities: Bearer authentication accepted; capabilities are valid`).
+- **`lip test` result (against `lip-postgres`):** **PASS** (5/5 checks passed: `discovery`, `health`, `authentication and capabilities`, `authentication rejection: unauthenticated mutation rejected`, `schema rejection: invalid payload rejected with problem details`).
+- **LIP process idle memory (`lip-postgres`, PID 1 `node packages/server/dist/cli.js`):**
+  - Container cgroup working set (`docker stats --no-stream`): **27.71 MiB** idle before diagnostics (**32.84 MiB** after `lip doctor` + `lip test`).
+  - Linux kernel `/proc/1/status`: **`VmRSS`: 87,780 kB (~85.72 MiB)** idle (**90,424 kB / ~88.30 MiB** post-test); **`VmHWM` (peak RSS): 106,172 kB (~103.68 MiB)**.
+  - SQLite `lip` container comparison: **29.21 MiB** cgroup idle (`VmRSS`: **92,748 kB / ~90.57 MiB**, `VmHWM`: **115,864 kB / ~113.15 MiB**).
+  - **Sizing conclusion (PD-006):** Well within the 512 MB Starter container limit (~5.4% cgroup working set, ~16.7% total `VmRSS`).
+
+#### Dependency audit (Task 0.12 — `npm audit --omit=dev`)
+- **Command:** `npm audit --omit=dev` (audited across all monorepo workspaces: 182 production dependencies, 203 development dependencies, 385 total).
+- **Total production vulnerabilities (`--omit=dev`):** **9 vulnerabilities** (1 critical, 4 high, 4 moderate, 0 low).
+- **Critical production vulnerabilities (1):**
+  - `proxy-addr` (`1.1.0 - 2.0.7`, indirect production dependency): IP spoofing via IPv4-mapped IPv6 trust subnet (`GHSA-jqcg-44mw-7w3h`, CVSS 9.1).
+- **High production vulnerabilities (4):**
+  - `@modelcontextprotocol/sdk` (`<=1.31.0`, direct production dependency in `@loyalty-interchange/mcp`): OAuth credential forwarding (`GHSA-6qxp-vccf-f47h`), cross-session task access (`GHSA-22jm-h49p-29qw`), validation memory exhaustion (`GHSA-46jr-4wx8-v453`), HTTP request body/batch limits (`GHSA-f897-62hf-6gxq`), plus 2 moderate advisories (`GHSA-rvq5-wwqv-78pq`, `GHSA-6prh-2h8m-c8cw`).
+  - `body-parser` (`2.0.0 - 2.3.0`, indirect production dependency): DoS via trailing bytes after compressed request body (`GHSA-27r3-jxmh-p828`, CVSS 7.5).
+  - `fast-uri` (`3.0.0 - 3.1.8`, indirect production dependency via TypeBox/Ajv): SSRF, host confusion, and authority injection (`GHSA-5jgf-p345-68v8`, `GHSA-f65p-4m7j-42xc`, `GHSA-fph4-wmhf-6fwf`, `GHSA-jqff-g426-hqxp`, `GHSA-qw65-cvwx-89v3`, plus moderate/low advisories).
+  - `zod` (`<4.6.6`, direct production dependency): Memory exhaustion while validating oversized constrained collections (`GHSA-mrhx-c7xc-m3w5`, CVSS 7.5).
+- **Moderate production vulnerabilities (4):** `@hono/node-server` (`1.19.10 - 2.1.2`), `hono` (`<=4.13.10`), `ip-address` (`<=10.7.3`), `qs` (`2.2.5 - 6.16.0`).
+- **Production vs. Development breakdown:** Out of **19 total vulnerabilities** across the full workspace (`npm audit`: 1 critical, 8 high, 10 moderate), **9 are in production dependencies** (1 critical, 4 high, 4 moderate) and **10 are in development-only dependencies** (4 high: `browserslist`, `js-yaml`, `source-map-js`, `vite`; 6 moderate: `@tailwindcss/typography`, `postcss-selector-parser`, `baseline-browser-mapping`, `vitest`, `@vitest/coverage-v8`, `@vitest/mocker`). No dependencies were upgraded in Phase 0; resolution is gated before Task 5.6 (Pilot).
 
 ## Phase 1 — PRD v1.0 & UX
 
@@ -117,7 +162,7 @@ application code is written.
 | 5.3 | Backups + restore drill on production Postgres | — | 2.2 | Restore proven using Render Postgres point-in-time restore (not an upstream local backup command); RPO/RTO recorded (PD-006) | |
 | 5.4 | Privacy policy, terms, consent texts (Arabic) | — | 0.10 | Published and linked in apps | |
 | 5.5 | Manual billing core (super-admin): record a payment; set/extend plan + period end; subscription state follows end date (grace → read-only → suspended) | G-12 | 1.6, 2.2 | Payment stored in piasters with stable id (double submit records once); payment records append-only; every plan/period change audited; a lapsed café moves grace (1–7) → read-only (8–37) → suspended (38+) automatically; suspended café cannot award but its customers can redeem; recording a payment restores full service at once | |
-| 5.6 | Pilot in 1–3 cafés; weekly review of repeat-visit rate | — | 5.1–5.5, 0.10, 0.11 | 4 weeks of data; issues logged to backlog | |
+| 5.6 | Pilot in 1–3 cafés; weekly review of repeat-visit rate | — | 5.1–5.5, 0.10, 0.11, 0.12 | **Mandatory gate (0.12):** All critical and high production vulnerabilities must be resolved or explicitly accepted in writing before the pilot. 4 weeks of data; issues logged to backlog | |
 
 **DoD:** M5 — pilot cafés use it daily for 4 weeks with no data-integrity incident.
 
