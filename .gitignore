@@ -42,7 +42,9 @@ Icon?
 .next/
 *.tsbuildinfo
 .lip/
-.agents/
+.agents/*
+!.agents/rules/
+!.agents/skills/
 .cursor/
 skills-lock.json
 packages/mcp/assets/
