@@ -4,7 +4,7 @@
 > كل مهمة مربوطة بالفجوة اللي بتقفلها (G-xx في `03-gap-analysis.md`) وبالقرار
 > اللي بتعتمد عليه (PD-xxx في `01-decisions.md`).
 
-Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 starts.
+Status: **Approved v1.0 (2026-11-11)** — supersedes Draft v0.1 (2026-11-06). Approved by the project owner with conditional Phase 0 (M0) engineering closure (`0.10` and `0.11` retained open as downstream gates) and Phase 1 authorized to start later (not started).
 
 ## Rules for Claude and contributors
 
@@ -19,7 +19,7 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
 
 | ID | Milestone | Exit = phase gate |
 | --- | --- | --- |
-| M0 | Decisions locked, baseline proven | Phase 0 DoD |
+| M0 | Decisions locked, baseline proven | Phase 0 DoD (conditionally closed 2026-11-11 — engineering gates satisfied; 0.10 and 0.11 remain open downstream gates) |
 | M1 | PRD v1.0 + clickable Arabic prototype approved | Phase 1 DoD |
 | M2 | Foundation: platform identity, cashier role, scalable data, OTP | Phase 2 DoD |
 | M3 | A cashier can award and redeem in a real café flow (staging) | Phase 3 DoD |
@@ -43,11 +43,21 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
 | 0.7 | Baseline: `npm ci && npm run typecheck && npm test` on Node 22 | — | — | All green, result + Node version recorded here | 2026-11-07 — Passed on Linux (`node:22.22.0`, npm `10.9.4`): 62/62 files, 479/479 tests, 0 failed, 0 skipped (Windows informational run: 450 passed, 6 failed, 23 skipped) |
 | 0.8 | Baseline: run Postgres profile + `lip doctor` + `lip test` | — | 0.7 | Conformance passes against Postgres runtime; idle memory of the LIP process recorded (sizes the instance, PD-006) | 2026-11-07 — Passed (`lip doctor` PASS 3/3, `lip test` PASS 5/5 against `lip-postgres`); idle memory: 27.71 MiB container cgroup / 87,780 kB (~85.7 MiB) `VmRSS` (fits PD-006 512 MB instance) |
 | 0.9 | Fix upstream AI-doc drift (`skills/lip/*`, old gap doc) or mark them non-authoritative; resolve `docs/postgres.md` "attached environment-specific disks" vs diskless `render.yaml` + release runbook | — | — | Skills and docs no longer contradict code | 2026-11-08 — Resolved drift in `skills/lip*`, marked `docs/api-docs-gap-analysis.md` historical, aligned `docs/postgres.md` + `docs-site/guides/postgres.mdx` with 3-service diskless `render.yaml`, and fixed `PostgresMigrator` cold-start lock ordering |
-| 0.10 | Legal pre-check: Egypt personal data law (151/2020), who is data controller (platform vs café) | — | — | Hard gate before the pilot (PD-006): written opinion from Egyptian counsel on whether hosting personal data in Frankfurt needs a PDPC permit and how to get it, or a permit application filed. Legal facts in PD-006 are unverified (secondary sources). If data must stay in Egypt, PD-006 reopens | |
-| 0.11 | Legal entity: company commercial registration | — | — | Registration issued; blocks SMS sender-ID registration, Meta Business verification, WhatsApp authentication-template approval, the real-number test in 2.4, and the pilot (5.6) | |
-| 0.12 | Dependency audit (`npm audit --omit=dev`) | — | 0.7 | Record total production vulnerabilities, critical + high packages, and prod vs dev breakdown; mandatory gate before 5.6 (Pilot) | 2026-11-07 — Recorded: 9 production vulnerabilities (1 critical: `proxy-addr`; 4 high: `@modelcontextprotocol/sdk`, `body-parser`, `fast-uri`, `zod`; 4 moderate: `@hono/node-server`, `hono`, `ip-address`, `qs`) + 10 dev-only (19 total) |
+| 0.10 | Legal pre-check: Egypt personal data law (151/2020), who is data controller (platform vs café) | — | — | Hard gate before 5.4 (legal texts) and 5.6 (Pilot, PD-006): written opinion from Egyptian counsel on whether hosting personal data in Frankfurt needs a PDPC permit and how to get it, or a permit application filed. Legal facts in PD-006 are unverified (secondary sources). If data must stay in Egypt, PD-006 reopens | |
+| 0.11 | Legal entity: company commercial registration | — | — | Registration issued; blocks SMS sender-ID registration, Meta Business verification, WhatsApp authentication-template approval, the real-number test in 2.4, WhatsApp marketing setup in 6.5, the pilot (5.6), and conditionally 6.8 (only if Google Wallet requires a business entity) | |
+| 0.12 | Dependency audit (`npm audit --omit=dev`) | — | 0.7 | Record total production vulnerabilities, critical + high packages, and prod vs dev breakdown; remediate critical/high exposure and run a fresh audit before 5.6 (Pilot) | 2026-11-11 (`1404518`, `FP-002`) — Baseline: 19 vulnerable nodes / 46 distinct advisory URLs (33 prod, 13 dev-only). Remediated to **0 vulnerabilities** (`npm audit --omit=dev` & `npm audit`). Linux (`node:22.22.0`, PostgreSQL 17, `--test-timeout=30000`): 483 passed, 0 failed, 0 skipped; Windows (`T017` admin exception): 452 passed, 6 failed, 25 skipped. Fresh pre-pilot audit + container/Cloud checks remain gated before 5.6 |
 
 **DoD:** PD-002/003/004/006/007 and 0.6 approved; baseline green; drift fixed.
+
+> **Phase 0 (M0): CONDITIONALLY CLOSED — ENGINEERING GATES SATISFIED.**
+>
+> Approved by the project owner on **2026-11-11**: all M0 engineering gates (`0.1`–`0.9` and `0.12` remediation at `1404518` / `FP-002`, including `PD-002` baseline gates `0.7` and `0.8`) are satisfied.
+>
+> **Open Deferred Downstream Gates (NOT Completed):**
+> - **Task 0.10** — Egyptian Personal Data Protection Law `151/2020` legal pre-check (mandatory before Task `5.4` Arabic legal-document finalization and Task `5.6` live pilot; preserves the right to reopen `PD-006` Frankfurt hosting architecture if qualified Egyptian counsel identifies legal restrictions).
+> - **Task 0.11** — Egyptian commercial registration (mandatory before Task `2.4` real-number OTP integration, Egyptian SMS sender-ID registration, Meta Business verification, WhatsApp authentication/marketing template approvals, Task `5.6` live pilot, Task `6.5` WhatsApp marketing connector, and conditionally Task `6.8` if Google Wallet requires a registered business entity).
+>
+> **Scope Boundary:** This conditional closure authorizes **engineering readiness only**. No legal clearance, regulatory approval, commercial registration, authorization to process real customer personal data, production OTP activation, or pilot/production launch authorization is implied.
 
 ### Phase 0 Baseline & Audit Records (Tasks 0.7, 0.8, 0.12)
 
@@ -91,9 +101,20 @@ Status: **Draft v0.1 (2026-11-06)** — needs owner approval before Phase 1 star
   - `fast-uri` (`3.0.0 - 3.1.8`, indirect production dependency via TypeBox/Ajv): SSRF, host confusion, and authority injection (`GHSA-5jgf-p345-68v8`, `GHSA-f65p-4m7j-42xc`, `GHSA-fph4-wmhf-6fwf`, `GHSA-jqff-g426-hqxp`, `GHSA-qw65-cvwx-89v3`, plus moderate/low advisories).
   - `zod` (`<4.6.6`, direct production dependency): Memory exhaustion while validating oversized constrained collections (`GHSA-mrhx-c7xc-m3w5`, CVSS 7.5).
 - **Moderate production vulnerabilities (4):** `@hono/node-server` (`1.19.10 - 2.1.2`), `hono` (`<=4.13.10`), `ip-address` (`<=10.7.3`), `qs` (`2.2.5 - 6.16.0`).
-- **Production vs. Development breakdown:** Out of **19 total vulnerabilities** across the full workspace (`npm audit`: 1 critical, 8 high, 10 moderate), **9 are in production dependencies** (1 critical, 4 high, 4 moderate) and **10 are in development-only dependencies** (4 high: `browserslist`, `js-yaml`, `source-map-js`, `vite`; 6 moderate: `@tailwindcss/typography`, `postcss-selector-parser`, `baseline-browser-mapping`, `vitest`, `@vitest/coverage-v8`, `@vitest/mocker`). No dependencies were upgraded in Phase 0; resolution is gated before Task 5.6 (Pilot).
+- **Production vs. Development breakdown (2026-11-07 baseline):** Out of **19 vulnerable package nodes** representing **46 distinct advisory URLs** across the full workspace (`npm audit`), **9 nodes (33 advisory URLs) were in production dependencies** (1 critical, 4 high, 4 moderate) and **10 nodes (13 advisory URLs) were in development-only dependencies** (4 high: `browserslist`, `js-yaml`, `source-map-js`, `vite`; 6 moderate: `@tailwindcss/typography`, `postcss-selector-parser`, `baseline-browser-mapping`, `vitest`, `@vitest/coverage-v8`, `@vitest/mocker`).
+- **Remediation & verification (`2026-11-11`, commit `1404518`, `FP-002` in `docs/context/07-fork-patches.md`):**
+  - Remediated all 19 baseline vulnerable package nodes (46 distinct advisory URLs: 33 production, 13 dev-only).
+  - **Final production npm audit (`npm audit --omit=dev`):** **0 vulnerabilities**.
+  - **Final full-monorepo npm audit (`npm audit`):** **0 vulnerabilities**.
+  - **Linux verification (`node:22.22.0` + PostgreSQL 17, `--test-timeout=30000`):** **483 passed, 0 failed, 0 skipped** (62 test files), plus `npm run spec:check`, `npm run typecheck`, and `npm run build` green.
+  - **Windows verification:** **452 passed, 6 failed, 25 skipped**, with `T017` (`specs/001-dependency-security-remediation/tasks.md`) administratively closed under the owner's explicitly approved, limited Windows platform exception for the 6 pre-existing NTFS/Windows host suites.
+  - **Remaining pre-pilot gates before Task 5.6:** Mandatory fresh `npm audit --omit=dev` re-verification prior to pilot launch, OS-package container-image vulnerability scan (e.g., Trivy/Snyk/Docker Scout), and live multi-tenant Cloud runtime readiness checks.
 
 ## Phase 1 — PRD v1.0 & UX
+
+> **Phase 1: AUTHORIZED TO START LATER — NOT STARTED.**
+>
+> Phase 1 is cleared to proceed with non-production planning and design activities (PRD v1.0, business-rule clarification, and Arabic RTL UX prototyping) under repository engineering governance. Do not execute Task `1.1` or any other Phase 1 task yet, and do not implement application features, create schema migrations, or configure production infrastructure.
 
 | ID | Task | Closes | Depends on | Acceptance criteria | Done |
 | --- | --- | --- | --- | --- | --- |
@@ -174,7 +195,7 @@ application code is written.
 | 6.2 | Owner dashboard: plan, end date, renewal reminder before expiry | G-12 | 5.5, 4.4 | Reminder visible before expiry; grace/read-only state shown clearly | |
 | 6.3 | Free trial, monthly/annual, upgrade/downgrade, plan limits enforced | G-12 | 5.5 | Limits enforced server-side | |
 | 6.4 | Automation engine: event triggers + "inactive N days" + birthday + near-reward + expiring | G-09 | 2.7 | Each trigger fires once per customer per rule window | |
-| 6.5 | WhatsApp Business connector (+ SMS fallback), templates, opt-out | G-10 | 6.4 | Frequency cap + send window enforced; cost counted against plan | |
+| 6.5 | WhatsApp Business connector (+ SMS fallback), templates, opt-out | G-10 | 6.4, 0.11 | Frequency cap + send window enforced; cost counted against plan | |
 | 6.6 | Campaign attribution with holdout + retention KPIs (repeat rate, frequency, cohorts) | G-13 | 6.4 | Lift report per campaign | |
 | 6.7 | Super-admin console: businesses, plans, suspensions, usage | — | 6.3 | Operator actions audited | |
 | 6.8 | Google Wallet loyalty passes (PD-009): save link after OTP sign-in, one pass per membership, rotating code as a customer device, pass notifications with WhatsApp only for customers without a pass | — | 6.4, 3.1 (+0.11 only if Google requires a business entity) | Four PD-009 checks pass: zero cost (no fee, no billing account/card); publishing approval (platform as single issuer, café logo consent in onboarding terms); real Android device in Egypt (saves, staff scans rotating code, Arabic RTL, notification arrives); save/delete callbacks work. Fallback to no barcode if the rotating-code test fails. Expired-reward comparison scheduled 8 weeks after go-live | |
