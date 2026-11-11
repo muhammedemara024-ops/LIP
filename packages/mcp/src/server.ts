@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { schemaRegistry } from "@loyalty-interchange/protocol";
@@ -124,9 +125,21 @@ async function main(): Promise<void> {
   await server.connect(transport);
 }
 
-const isMain =
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+export function isMainModule(argvPath: string | undefined, moduleUrl: string): boolean {
+  if (!argvPath) return false;
+  try {
+    const resolvedPath = resolve(argvPath);
+    const directUrl = pathToFileURL(resolvedPath).href;
+    if (moduleUrl === directUrl) return true;
+    const realPath = realpathSync(resolvedPath);
+    const realUrl = pathToFileURL(realPath).href;
+    return moduleUrl === realUrl;
+  } catch {
+    return false;
+  }
+}
+
+const isMain = isMainModule(process.argv[1], import.meta.url);
 
 if (isMain) {
   main().catch((error) => {

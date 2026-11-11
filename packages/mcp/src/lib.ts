@@ -63,6 +63,9 @@ export function validateJsonPayload(
   schemaName: string,
   json: string
 ): { ok: true } | { ok: false; message: string } {
+  if (!Object.hasOwn(schemaRegistry, schemaName)) {
+    return { ok: false, message: `Unknown schema: ${schemaName}` };
+  }
   const entry = schemaRegistry[schemaName as keyof typeof schemaRegistry];
   if (!entry) {
     return { ok: false, message: `Unknown schema: ${schemaName}` };
