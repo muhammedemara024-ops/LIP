@@ -11,7 +11,11 @@
                  • rotating member QR tokens, branch QR claims, pending queue
                  • staff "bill amount" → synthetic FoodserviceOrder
                  • automation rules, WhatsApp/SMS/push providers, consent, caps
-                 • plan limits
+                 • plan-limit monitoring: authoritative customer/branch counts;
+                   no enforcement in P0, Cloud usage events never in the
+                   join/award/redeem success path (PD-035)
+                 • visit analytics: Cairo-day visits, first-purchase branch
+                   attribution (PD-032); award/redeem SLO checks (PD-033)
                  • product permissions for every role; tenant/branch from
                    session or device (PD-014)
                  • owner OTP sessions, owner invites; Super Admin via OIDC+MFA
@@ -20,6 +24,11 @@
                    (PD-008 A1)
                  • subscription stage engine (grace / read-only / suspended)
                    (PD-005 A2)
+                 • paper-card migrations: pending → customer accepts →
+                   `migration` adjustment (PD-021, PD-022)
+                 • reward display text + issued-reward/reservation snapshots;
+                   branch status and opening hours; fraud alerts
+                   (PD-024 – PD-027)
                  │ merchant API key (server-side only)
                  ▼
      LIP runtime (this repo)  /lip/v1  +  /platform/v1  +  /admin/api/v1
@@ -42,15 +51,15 @@ PD-005 A1); Kashier is deferred; Stripe stays unused.
 | Our module (brief) | LIP construct | Where | Fit |
 | --- | --- | --- | --- |
 | Tenant management | tenant (`tenant_id`); Cloud organizations/projects/environments | `access-control.ts`, `apps/cloud/src/service.ts` | Good |
-| Branch management | Location registry + location-scoped principals + per-location reports | `locations.ts`, `location-reports.ts` | Good |
+| Branch management | Location registry + location-scoped principals + per-location reports | `locations.ts`, `location-reports.ts` | Good — locations have an `active` flag; branch deactivation, opening hours and their enforcement live in the BFF (PD-026) |
 | Staff & permissions | Tenant users & API keys, roles `owner/admin/operator/developer/viewer/integration`, `allowed_location_ids` | `access-control.ts` | Partial — no cashier role, no staff login UX. `/lip/v1` checks only the permission (`protocol:write` covers every write) and does not enforce `allowed_location_ids`, so the BFF enforces all product permissions (PD-014); the cashier fork patch is optional |
 | Customer management | Profiles, consent, events, CSV import | `customer-data.ts` (`/platform/v1/members`, `/events`, `/imports/members`) | Partial — JSON-blob storage, see G-11 |
 | Universal customer account (PD-001) | Customer identity: `{tenant, issuer, subject}` → `crv_cus_*` → `member_id` | `packages/identity`, `apps/cloud/src/customer-*.ts` | Gap — per-tenant, not platform-wide |
 | Loyalty engine — stamps | `visit_stamp_policy` (threshold, reset, auto-issue reward) | `reference/src/config.ts`, `engine.ts` | Good |
-| Loyalty engine — points | `earn_rate`, `earning_policy` exclusions/min spend/channels | same | Good |
+| Loyalty engine — points | `earn_rate`, `earning_policy` exclusions/min spend/channels | same | Good — except: `orders/adjust` void/refund converts the spend delta at the **current** earn rate (`engine.ts` 968–990), so a void after an earn-rate decrease under-claws (executed 2026-11-12). Fork patch FP-003 (design approved, not implemented, PD-037); already-expired points excluded and missing/uncertain accrual handled per PD-038 P7/P8 |
 | Tiers | `tiers`, `tier_policy` (annual period, IANA tz), multipliers | same + `spec/account-experience.md` | Good |
 | Expiry | `point_expiration` lots, FIFO consumption, warning days | engine | Good |
-| Rewards / redemption | Catalog rewards, issued-reward wallet (code/QR), reserve/capture/reverse | `/lip/v1/redemptions/*`, `/issued-rewards/*` | Good — but a stamp-reward void needs our void operation (PD-008 A1: card resets are not reversed by `orders/adjust`); one reward per order and reservation timeouts are BFF rules (PD-015, PD-020); free-item redemptions write no ledger entry, so reports count reservations |
+| Rewards / redemption | Catalog rewards, issued-reward wallet (code/QR), reserve/capture/reverse | `/lip/v1/redemptions/*`, `/issued-rewards/*` | Good — but a stamp-reward void needs our void operation (PD-008 A1: card resets are not reversed by `orders/adjust`); one reward per order and reservation timeouts are BFF rules (PD-015, PD-020); free-item redemptions write no ledger entry, so reports count reservations; up to 5 points rewards, with display text and snapshots kept in our layer (PD-024, PD-025) |
 | Program configuration UI | Draft → validate → publish → rollback with audit | `program-management.ts`, Admin "Configure" | Good engine, wrong UX for café owners |
 | Transactions | `orders/evaluate`, `accruals`, `orders/adjust`, ledger | `/lip/v1/*` | Good; needs a "bill amount" order builder |
 | QR — staff scans customer | — | — | **Missing** (G-02) |

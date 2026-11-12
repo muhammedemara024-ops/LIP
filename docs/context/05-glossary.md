@@ -63,4 +63,22 @@
 | كود التأكيد | Claim code | short code on the customer's phone that the cashier types to confirm a pending claim |
 | جلسة الموظف | Staff session | a signed-in staff member on a registered branch device; the only actor that grants purchase value |
 | تعويض الخدمة | Service recovery adjustment | owner-only manual adjustment classified `service_recovery` (e.g. purchases lost to an outage) |
+| نقل كارت الورق | Paper-card migration | ours: one-time move of a paper stamp card onto a member's card as a `migration` adjustment; resulting balance below the threshold (PD-021) |
+| نقل معلّق | Pending migration | ours: an owner's migration request waiting for the customer to accept in the app; expires after 15 minutes (PD-022) |
+| نسخة المكافأة | Reward snapshot | ours: the fixed record of what an issued reward or open reservation promised; later program changes never alter it (PD-025) |
+| إيقاف الفرع | Branch deactivation | ours: owner action that blocks a branch's devices, staff sessions and Branch QR while keeping history and balances (PD-026) |
+| مواعيد العمل | Opening hours | weekly hours per branch in Cairo time, used only for fraud alerts (PD-026) |
+| تنبيه احتيال | Fraud alert | ours: owner alert for rapid awards, out-of-hours activity or staff concentration; never blocks a transaction (PD-027) |
+| تأكيد المكافأة المتكررة | Repeat-award confirmation | ours: cashier prompt before a new award to the same customer within 10 minutes; shows no extra customer data (PD-027) |
+| نسبة العودة خلال 30 يوم | 30-day repeat rate | share of customers whose first qualifying visit was at least 30 full days before the measurement date who made a visit on a different Cairo day within 30 days after it (PD-028, PD-032) |
+| زيارة | Visit | ours, analytics only: one café × customer × `Africa/Cairo` calendar day with at least one non-voided qualifying purchase at any branch; never an accounting record (PD-032) |
+| شراء مؤهِّل | Qualifying purchase | ours: a customer purchase captured by a staff session, not voided, meeting the café's minimum eligible spend and channel rules in force at the time; below-minimum purchases and test transactions never qualify (PD-038 P2, P3) |
+| فرع الزيارة | Visit branch | ours: the branch of the day's first qualifying purchase; recomputed after voids (PD-032) |
+| ملف الموظف الخاص بالمالك | Owner staff profile | ours: the owner's own PIN-based staff identity for counter work on registered devices; owner-only actions still need fresh owner authentication (PD-034) |
+| هدف التوافر الداخلي | Internal availability SLO | ours: ≥ 99.5% per month for awarding and for redemption, 08:00–02:00 Cairo; not a contractual SLA (PD-033) |
+| تغطية المراقبة | Monitoring coverage | ours: share of the SLO window's expected minutes that have check results; at least 99.5% required, missing minutes count as unavailable for PASS; a definite failure stays FAIL whatever the coverage (PD-033, PD-038 P6) |
+| مقهى الاختبار | Test café | ours: dedicated non-customer café that runs the SLO checks on the production path, with test identities only, excluded from billing, plan usage and all analytics (PD-038 P3) |
+| مجموعة فرع الاكتساب | Acquisition-branch cohort | ours: customers grouped by the branch of their first café visit, for the branch-filtered repeat rate; labelled separately from branch activity (PD-038 P5) |
+| شراء صفري الاستحقاق مُتحقَّق منه | Verified zero-accrual purchase | ours: a purchase whose own accrual entry, found by an authoritative and complete read of LIP's ledger, shows 0 points; the only kind a void may close without a points reversal; anything less certain fails closed (PD-038 P8) |
+| [Product] | Product name placeholder | temporary name used until the final Arabic/Latin name is approved (PD-029) |
 | مرجع | Reference package | an upstream part we read but do not ship (e.g. upstream Admin, wallet) |

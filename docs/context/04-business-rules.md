@@ -34,6 +34,13 @@ reimplement them, call LIP. Rules marked (OURS) must be built in our layer.
   customer export in P0. (OURS, PD-013 — legal confirmation pending in task 0.10)
 - MUST: no personal data is written to LIP `/platform/v1` customer records; the
   customer directory is the only store. (OURS, PD-013)
+- MUST: joining collects only an OTP-verified phone number and a first name;
+  the first name is entered once for the universal account, is editable, and
+  is not asked again for another café. No birthday, last name, gender or email
+  in P0. (OURS, PD-023 — legal confirmation pending in task 0.10)
+- MUST: marketing consent is optional, unchecked by default and per café;
+  declining never blocks enrollment; service notices are separate from
+  marketing consent. (OURS, PD-023)
 - MUST: every Super Admin read of customer directory data is audited with a
   reason. (OURS, PD-013)
 
@@ -48,6 +55,10 @@ reimplement them, call LIP. Rules marked (OURS) must be built in our layer.
 - Default stamps rule (illustrative): 1 stamp per paid order; 5 stamps → 1 free drink; card resets on issue.
 - MUST: one active program per café, stamps or points; the type is locked after
   the first publish. (OURS + LIP, PD-012)
+- MUST: the stamp threshold is immutable after the first publish. Earn-rate
+  and reward-cost changes apply only to future accruals and new reservations.
+  Every program or reward change is owner-only, needs a fresh OTP, is audited,
+  and is blocked in the read-only and suspended stages. (OURS, PD-025)
 - MUST: stamp programs always reset the card on issue (`reset_on_issue: true`).
   (OURS, PD-012)
 - MUST: minimum eligible spend is at least 1 piaster, so a zero-value order
@@ -63,6 +74,29 @@ reimplement them, call LIP. Rules marked (OURS) must be built in our layer.
   in Cairo (PD-007 C1).
 - MUST: expired points are consumed FIFO by earliest expiry; spent points never expire. (LIP)
 - A void consumes the soonest-expiring points first. (LIP; accepted, PD-020)
+- MUST (PD-037, refined by PD-038 P7): a void of a points purchase reverses
+  exactly the points that purchase earned, net of earlier adjustments to the same order, regardless of
+  later earn-rate, multiplier or expiry-policy changes. Upstream LIP recomputes
+  the clawback at the current earn rate, so this needs fork patch FP-003
+  (design approved, not implemented; `07-fork-patches.md`).
+- MUST (PD-038 P7): points of that purchase that already expired are not
+  debited again; points already spent on rewards are still reversed, and the
+  balance may go negative. The candidate formula −max(0, E + A − X) is not
+  proven safe when points are consumed by redemptions or other voids before
+  expiry and is not an implementation-ready algorithm. The point-lot
+  attribution algorithm is unresolved and needs separate owner approval,
+  source-level verification and executable regression tests before FP-003
+  implementation approval (PD-038 P7, open).
+- MUST (PD-038 P8): a points void needs the purchase's original accrual. A
+  missing result is recovered from LIP ledger records, never by re-sending
+  the accrual, and fails closed: only an authoritative, complete ledger read
+  showing exactly one accrual entry for the purchase counts as evidence; only
+  a verified zero-accrual purchase is voided without a reversal; any
+  uncertain state posts nothing and keeps the member blocked for
+  reconciliation. P0 programs never enable a credit policy.
+- MUST (PD-038 P10): a points void is serialized per member, with the
+  PD-008 A1 durable member block, forward-only recovery and
+  reconciliation-before-unlock.
 
 ## Transactions
 
@@ -183,6 +217,16 @@ Method A — customer scans branch QR (convenience path):
   PD-015; supersedes the earlier "default; owner may allow stacking")
 - MUST: a redemption never takes a balance below zero; a clawback may. (PD-015)
 - Reward expiry (approved, PD-020): 30 days after issue; café setting 7–90 days.
+- MUST: a stamp program has exactly one reward; a points program has at most 5
+  active rewards, each with a positive whole-number points cost; the customer
+  chooses the points reward and the cashier confirms handing over the item.
+  (OURS, PD-024)
+- MUST: reward names and descriptions are display text kept in our layer;
+  editing them does not republish the LIP program. (OURS, PD-025, PD-007)
+- MUST: an issued reward keeps an immutable snapshot of what was promised and
+  stays redeemable until its own expiry; a points reservation keeps the reward
+  id, cost and terms it was created with. Deactivating a points reward blocks
+  new reservations only. (OURS, PD-024, PD-025)
 - MUST: stamp rewards are reserved only through `issued_reward_id`, never by a
   direct catalogue reserve; a stamp reward's direct cost equals the threshold.
   (OURS, PD-008 A1, PD-012)
@@ -210,6 +254,14 @@ Method A — customer scans branch QR (convenience path):
   owner gifts never use `stamp-` reward ids. (OURS, PD-008 A1)
 - MUST: balance corrections happen only through voids or owner adjustments
   with a classification; support staff never change balances. (OURS, PD-019)
+- MUST (OURS, PD-030): no partial refunds in P0. A wrong bill amount with the
+  customer present is fixed by the full void, reconciled first, then a
+  genuine new capture with the customer's code or a confirmed claim; a
+  re-capture is refused while the void is unresolved. With the customer
+  absent there is no amount correction in P0 (P1): the purchase stays as
+  recorded unless the owner voids it in full. No manual adjustment
+  (including `service_recovery`) is linked to or presented as an amount
+  correction. In stamp programs a wrong amount alone changes no stamps.
 - MUST: every non-purchase source of value (manual adjustment, campaign,
   automation, import) carries a stable business id and is idempotent. (PD-003)
 - MUST: a staff profile's phone number is OTP-verified at creation; changing it
@@ -217,8 +269,65 @@ Method A — customer scans branch QR (convenience path):
 - MUST: a staff session cannot award, confirm a claim, or redeem for the
   customer account with the staff member's own phone number; the owner can,
   with an audit record. (PD-003)
-- Owner alert on anomalies: many scans of the same customer in a short window,
-  scans outside opening hours, a staff member awarding to the same few customers.
+- MUST: fraud alerts are alert-only and never block a transaction by
+  themselves. Rules (platform-fixed, PD-020): more than 3 awards to one
+  customer at one café in a rolling 60 minutes; an award, redemption or claim
+  confirmation more than 30 minutes outside the branch's opening hours
+  (`Africa/Cairo`, overnight shifts); over a rolling 7 days, at least 20
+  awards by one staff member with more than 40% to their top 3 customers.
+  Alerts are deduplicated by rule, subject and window, shown inside Overview,
+  never messaged in P0; marking one reviewed is audited and never changes
+  transaction history. (OURS, PD-027)
+- MUST: a genuinely new award to the same customer at the same café within 10
+  minutes needs the cashier's explicit confirmation; idempotent retries do not
+  trigger it; the prompt shows no customer data beyond PD-013. (OURS, PD-027)
+
+## Paper-card migration (OURS, PD-021, PD-022)
+
+- MUST: stamp programs only; owner-only, through a staff session on a
+  registered device, after a fresh owner OTP; only in the first 60 days after
+  the café's first program publish and only where PD-005 A2 allows
+  `migration`.
+- MUST: the resulting balance stays below the threshold: migrated stamps ≤
+  t − 1 − current balance.
+- MUST: at most one successful migration per member per program, posted as a
+  `migration` adjustment with a stable business id, under the member lock,
+  refused while a void is in progress (PD-008 A1).
+- MUST: nothing is posted until the customer accepts in the app and the owner
+  attests that the paper card was collected or marked VOID; one pending
+  migration per member per program, expiring after 15 minutes; an expired or
+  declined request can never be posted.
+- MUST: at posting, window, stage, limit and balances are re-checked
+  atomically; posting is idempotent and safe under concurrent requests; the
+  audit records balances before and after, stamps migrated, time, owner,
+  device, branch, reference, both confirmations and the outcome.
+
+## Branches (OURS, PD-026)
+
+- MUST: every active branch takes part in the café's single program; customers
+  earn and redeem at any active branch.
+- MUST: deactivating a branch is owner-only and audited, and immediately blocks
+  its staff devices, staff sessions and Branch QR on the server; history,
+  balances and issued rewards are kept; open claims at the branch are
+  cancelled and open reservations reversed without double redemption or
+  balance loss.
+- MUST: weekly opening hours per branch in `Africa/Cairo`, with overnight shifts
+  and closed days; used only for fraud alerts, never to block a transaction.
+- Customer history shows the branch of each visit; owner reports filter by
+  branch.
+- MUST (OURS, PD-032): a visit is one café × customer × `Africa/Cairo`
+  calendar day with at least one successful, non-voided qualifying purchase
+  at any branch. It is attributed to the branch of that day's first
+  qualifying purchase and recomputed when voids change that set; branch
+  visit totals add up to the café total. Redemption-only orders, owner
+  adjustments, migration credits and idempotent retries never count.
+  A qualifying purchase meets the café's minimum eligible spend and channel
+  rules in force at the time (PD-038 P2); ties go to the earlier
+  server-recorded capture time, then the purchase id (P4). Test, probe and
+  monitoring transactions never count; SLO checks run from a dedicated,
+  isolated test café excluded from billing, plan usage and all analytics
+  (P3). Branch-filtered repeat rate is an acquisition-branch cohort report,
+  labelled separately from branch activity (P5).
 
 ## Language & locale (OURS, PD-007)
 
@@ -304,7 +413,15 @@ Method A — customer scans branch QR (convenience path):
 
 ## Subscriptions (OURS on LIP Cloud)
 
-- Plan limits (customers, branches, messages) enforced server-side under a lock (LIP Cloud quotas).
+- Plan limits (customers, branches, messages) are defined per plan (task 1.6).
+  In P0 they are monitored, not enforced: nothing is refused because a
+  capacity limit is reached (PD-035). Our platform layer keeps the
+  authoritative, uncapped customer and branch counts. LIP Cloud usage
+  recording, if used, stays outside the join, award and redeem success
+  paths, and its failure never blocks them. Security limits, billing-stage
+  restrictions (PD-005 A2), tenant isolation and accounting safeguards stay
+  fully enforced. Server-side enforcement under a lock arrives with P1 task
+  6.3.
 - Billing at launch is manual (PD-005 A1): payment is collected offline (cash,
   InstaPay, Vodafone Cash, bank transfer) and recorded by the super admin. No
   online payment and no stored card tokens.
