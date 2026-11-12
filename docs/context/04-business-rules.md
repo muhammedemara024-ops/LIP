@@ -2,6 +2,9 @@
 
 "MUST" rules are binding. "Default" values are **proposed starting values,
 not yet approved** — owner-configurable once approved in 01-decisions.md.
+Exception: the values listed in PD-020 (operational defaults) were approved on
+2026-11-12 and are marked "approved" with the PD-020 reference where they
+appear below; any other "Default" stays proposed.
 Rules marked (LIP) are already enforced by the LIP engine/spec — do not
 reimplement them, call LIP. Rules marked (OURS) must be built in our layer.
 
@@ -22,6 +25,17 @@ reimplement them, call LIP. Rules marked (OURS) must be built in our layer.
   source and timestamp; transactional messages do not require marketing consent. (LIP platform; OURS for per-brand UI)
 - MUST: account deletion closes every membership, erases profile PII, keeps the
   pseudonymous immutable ledger. (LIP erase contract + OURS orchestration)
+- MUST: account deletion is queued, not run, while a void is in progress for
+  one of the customer's memberships; it runs after the void completes or is
+  resolved. (OURS, PD-008 A1)
+- MUST: the owner sees a customer's first name, card progress, visit history
+  and the last 3 digits of the phone number; owner search is by first name plus
+  last 3 digits only; the cashier sees first name and card progress only; no
+  customer export in P0. (OURS, PD-013 — legal confirmation pending in task 0.10)
+- MUST: no personal data is written to LIP `/platform/v1` customer records; the
+  customer directory is the only store. (OURS, PD-013)
+- MUST: every Super Admin read of customer directory data is audited with a
+  reason. (OURS, PD-013)
 
 ## Money, points, stamps
 
@@ -29,10 +43,26 @@ reimplement them, call LIP. Rules marked (OURS) must be built in our layer.
 - MUST: eligible spend = line subtotal − line discount; tax, tip, service charge
   do not earn by default. (LIP foodservice profile)
 - MUST: rounding applies once on total eligible spend, never per line. (LIP)
-- Default points rule (illustrative): 5 points per 100 EGP.
+- Default points rule (illustrative): 5 points per 100 EGP (approved as the
+  wizard suggestion, PD-020).
 - Default stamps rule (illustrative): 1 stamp per paid order; 5 stamps → 1 free drink; card resets on issue.
+- MUST: one active program per café, stamps or points; the type is locked after
+  the first publish. (OURS + LIP, PD-012)
+- MUST: stamp programs always reset the card on issue (`reset_on_issue: true`).
+  (OURS, PD-012)
+- MUST: minimum eligible spend is at least 1 piaster, so a zero-value order
+  never earns. (OURS, PD-012)
 - MUST: reaching a stamp threshold issues the reward exactly once per accrued order. (LIP)
+- MUST: after a completed void, a stamp card's balance lies in [0, threshold).
+  (OURS, PD-008 A1)
+- MUST: stamps never expire. (LIP behaviour; OURS setting, PD-012)
+- Point expiry (approved, PD-020): 365 days after earning by default; café
+  setting 180, 365, 545 or 730 days, or never. "Never" vs "expiring" is locked
+  after the café's first purchase; a duration change applies only to points
+  earned afterwards; warning 30 days before. Expiry is shown as date and time
+  in Cairo (PD-007 C1).
 - MUST: expired points are consumed FIFO by earliest expiry; spent points never expire. (LIP)
+- A void consumes the soonest-expiring points first. (LIP; accepted, PD-020)
 
 ## Transactions
 
@@ -53,13 +83,50 @@ reimplement them, call LIP. Rules marked (OURS) must be built in our layer.
   setting: "Amount paid" (default) or "Subtotal before service & VAT".
 - MUST (PD-008): the earn preview comes from LIP `orders/evaluate`, never from
   client-side math.
-- MUST (PD-008): above the café's large-bill threshold (default 2,000 EGP) the
-  amount is typed twice; above 5 × the threshold it is rejected (owner-only
-  adjustment).
-- MUST (PD-008): a cashier may void only their own purchase within 10 minutes
-  (full clawback via `orders/adjust`); a reward issued by that purchase is
-  cancelled in the same void operation if unredeemed; if already redeemed, the
-  void is blocked and only the owner resolves it.
+- MUST (PD-008): above the café's large-bill threshold (default 2,000 EGP,
+  approved, PD-020) the amount is typed twice; above 5 × the threshold it is
+  rejected (owner-only adjustment).
+- MUST (PD-008, amended by A1): a void never grants new purchase or tier value;
+  the only stamps it adds back are the system stamp-restore correction
+  (PD-003 A2). A cashier may void only their own purchase
+  within 10 minutes (full clawback via `orders/adjust`). Owner voids and owner
+  full refunds of stamp purchases use the same void operation.
+- MUST (PD-008 A1): in a stamp program the void operation computes a plan once,
+  saves it and replays it, never recomputes it: cancel k unredeemed,
+  unreserved stamp rewards issued after the purchase (k = max(0,
+  ⌈(stamps earned − current balance) / threshold⌉), where stamps earned is the
+  amount stored on the purchase record, never recomputed from the current
+  program), void the order, then post
+  the system stamp-restore correction of k × threshold (PD-003 A2). Ids:
+  `void:<void id>:cancel:<reward id>`, `void-<void id>`,
+  `void-<void id>-restore`.
+- MUST (PD-008 A1): the void is blocked and goes to the owner if the program was
+  republished since the purchase, another void is in progress for that member,
+  the balance is outside [0, threshold), or fewer than k cancellable rewards
+  exist.
+- MUST (PD-008 A1): after a crash or failure, reconcile uncertain LIP calls
+  against authoritative records using the persisted step plan and stable
+  business IDs; retry idempotently with the same identifiers and request bodies.
+  Calls may have succeeded before the BFF saved their results. After 15 minutes
+  of retries mark the void *needs owner*; after 24 hours escalate to the Super
+  Admin. Audit recovery and evidence, and alert while unreconciled.
+- MUST (PD-008 A1): owner and Super Admin resolution, like automatic completion,
+  reaches a terminal state and clears the durable member flag only after all
+  expected cancellation, clawback and required stamp-restore effects are
+  verified against authoritative LIP reward and ledger records, including any
+  owner settlement. No force-close or administrative override clears the
+  block while inconsistencies remain; unreconciled cases remain blocked and
+  escalated for audited recovery.
+- MUST (PD-008 A1): every operation that can change one member's stamp balance
+  or rewards — purchases, redemptions, voids, owner adjustments of any
+  classification, and campaign, automation or import grants — is serialized
+  by a per-member lock. A durable "void in progress" flag refuses all of them
+  for that member (clear error) until the void completes or is resolved; only
+  the void's own steps and the owner's settlement of a *needs owner* void
+  bypass it. Escalation after 15 minutes and 24 hours never clears the flag
+  without the reconciliation required above.
+- MUST (PD-008 A1): a redemption without a purchase uses a synthetic zero-value
+  order in its own `order_id` namespace and is never accrued.
 
 ## QR flows (OURS, PD-003)
 
@@ -98,23 +165,51 @@ Method A — customer scans branch QR (convenience path):
 - The customer's phone shows their first name and a claim code, unique among
   open claims at that branch.
 - MUST: the cashier confirms by **typing** the claim code; no pick-from-a-list.
-  A wrong code is rejected; repeated wrong codes cancel the claim (default 3).
-- Pending claims expire (default 15 min). One open claim per customer per branch.
-- Branch QR codes are rotatable by the owner if leaked.
+  A wrong code is rejected; repeated wrong codes cancel the claim (3 attempts,
+  approved and platform-fixed, PD-020).
+- Pending claims expire (15 min, approved and platform-fixed, PD-020). One open
+  claim per customer per branch.
+- Branch QR codes are rotatable by the owner if leaked, in every subscription
+  stage (PD-005 A2).
 
 ## Rewards & redemption
 
 - MUST: redemption = reserve → capture; abandon = reverse/expire. Use the
   effect returned by the reservation, never recompute from display text. (LIP)
 - MUST: an issued reward code/QR is a bearer credential: unique, never logged. (LIP)
-- Default: one reward per order; owner may allow stacking.
-- Default reward expiry: 30 days after issue (configurable).
+- MUST: rewards are free items only in P0; discount rewards are P1. (OURS, PD-015)
+- MUST: at most one reward per order, enforced by the BFF with a unique
+  constraint, including concurrent attempts. Stacking is backlog. (OURS,
+  PD-015; supersedes the earlier "default; owner may allow stacking")
+- MUST: a redemption never takes a balance below zero; a clawback may. (PD-015)
+- Reward expiry (approved, PD-020): 30 days after issue; café setting 7–90 days.
+- MUST: stamp rewards are reserved only through `issued_reward_id`, never by a
+  direct catalogue reserve; a stamp reward's direct cost equals the threshold.
+  (OURS, PD-008 A1, PD-012)
+- MUST: the BFF never issues a reward id starting with `stamp-`; owner gifts
+  use other ids. (OURS, PD-008 A1)
+- MUST: a reservation not captured within 120 seconds is reversed by the BFF.
+  (OURS, PD-020)
+- MUST: "rewards redeemed" reports count reservation (capture) records, because
+  free-item redemptions write no ledger entry. (OURS, PD-015, PD-018)
 
 ## Staff controls (OURS)
 
 - Cashier role: record purchase, redeem reward, view customer first name +
   card progress. No export, no program edits, no other branches.
 - MUST: manual adjustments are owner-only; the cashier cap is 0. (PD-003)
+  Only exception: the system stamp-restore correction inside a permitted void
+  (PD-003 A2); no person can request it or enter its amount.
+- MUST: the BFF enforces every product permission; tenant and branch come from
+  the session or registered device, never from the request body. LIP's
+  `protocol:write` alone is not a sufficient check. (OURS, PD-014)
+- MUST: the owner awards and redeems only through a staff session on a
+  registered device. One owner per café. (OURS, PD-014)
+- MUST: an owner stamp adjustment outside a void keeps the balance in
+  [0, threshold), is refused while a void is in progress for that member, and
+  owner gifts never use `stamp-` reward ids. (OURS, PD-008 A1)
+- MUST: balance corrections happen only through voids or owner adjustments
+  with a classification; support staff never change balances. (OURS, PD-019)
 - MUST: every non-purchase source of value (manual adjustment, campaign,
   automation, import) carries a stable business id and is idempotent. (PD-003)
 - MUST: a staff profile's phone number is OTP-verified at creation; changing it
@@ -165,8 +260,29 @@ Method A — customer scans branch QR (convenience path):
 - Channel: WhatsApp authentication template first; SMS fallback in Arabic,
   WebOTP-formatted (`@<domain> #<code>` last line), one 70-character segment.
 - OTP cost is a platform cost, never counted against a café's message allowance.
+- The OTP defaults above are approved and platform-fixed (PD-020).
 
-## Messaging & automation (OURS, P1)
+## Owner and Super Admin sign-in (OURS, PD-010, PD-011)
+
+- MUST: owners sign in by phone number + OTP through the PD-004 OTP service;
+  session 30 days, sliding.
+- MUST: a fresh OTP is required to create or deactivate staff, publish the
+  program, post a manual adjustment, or change the owner's phone number.
+- MUST: the Super Admin signs in through OIDC with MFA enforced by the identity
+  provider; we store no Super Admin passwords (provider chosen in task 2.2).
+- MUST: every session can be revoked; cookies are host-only with the `__Host-`
+  prefix, one per subdomain.
+- MUST: an owner invite is single-use, bound to the owner's phone number, valid
+  72 hours and stored hashed.
+- Live OTP and invite delivery to real numbers depends on task 0.11.
+
+## Messaging & automation (OURS; items marked P0 are P0, the rest P1)
+
+- (P0) P0 sends OTP messages only (PD-016); consent is still captured at sign-up,
+  and the customer app shows balances that expire soon. Live delivery depends
+  on task 0.11.
+- (P0) Support: a platform WhatsApp number with phone fallback, separate from the
+  OTP and marketing senders (PD-019; depends on tasks 0.10 and 0.11).
 
 - MUST: marketing sends require per-brand marketing consent; every message has opt-out.
 - MUST: no marketing messages go to the customers of a café in the suspended
@@ -200,12 +316,27 @@ Method A — customer scans branch QR (convenience path):
 - MUST: every change to a subscription's plan or period end is audited (actor,
   before/after, time).
 - MUST: subscription state follows the period end date on the server, with no
-  human step. Stages after the end date (defaults):
+  human step. Stages after the end date (approved, PD-020; Cairo calendar days):
   1. Grace, days 1–7: everything works normally.
-  2. Read-only, days 8–37: owner cannot change program, campaigns or staff;
-     cashiers keep awarding and redeeming.
-  3. Suspended, after day 37: no new awards; customers can still redeem what
-     they hold. Balances are never removed.
+  2. Read-only, days 8–37: owner cannot add staff, publish or change the
+     program or campaigns, or post `bonus`/`gift`/`migration` adjustments
+     (`migration` is owner-only and never a bypass for `correction` or
+     `service_recovery`, PD-005 A2); cashiers keep
+     awarding and redeeming; voids, `correction`/`service_recovery`
+     adjustments, revoking staff, devices or sessions, and rotating a Branch
+     QR still work.
+  3. Suspended, day 38 onward: no new awards, no claim confirmations, no
+     new customer joins and no `bonus`/`gift`/`migration` adjustments; customers can still redeem what they hold; voids,
+     `correction`/`service_recovery` adjustments, revocations and Branch QR
+     rotation still work. Balances are never removed.
+  Full table: PD-005 A2.
+- MUST: the stage is computed and enforced in our layer. It is never
+  implemented with Cloud environment suspension, a Cloud subscription status
+  other than `active`/`trialing`, or LIP write-freeze, because each would also
+  block redemptions, voids and revocations. (PD-005 A2; runtime check in task
+  5.5)
+- MUST: the owner sees the plan, end date and current stage on the dashboard
+  Overview and Settings pages. (PD-017, PD-018)
 - MUST: recording a payment restores full service immediately.
 - During suspension, point and reward expiry keep running as configured;
   customers are never messaged about a café's billing.

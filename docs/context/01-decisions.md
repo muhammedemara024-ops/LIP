@@ -78,7 +78,8 @@ Consequences:
   `spec/` may not (golden rule 1 in `CLAUDE.md`).
 - Every modification to upstream code is logged in `07-fork-patches.md`
   (file, reason, PD reference, upgrade impact). Expected early entries:
-  cashier role (G-05, `access-control.ts`), platform storage (G-11).
+  cashier role (G-05, `access-control.ts` — optional since PD-014), platform
+  storage (G-11).
 - One monorepo; our apps live in new directories next to upstream code
   (e.g. `apps/bff`, `apps/staff`, `apps/customer`, `apps/dashboard`).
 
@@ -116,7 +117,7 @@ and patterns, write our own engine":
 
 Date / approved by: 2026-11-06, project owner.
 
-## PD-003 — Staff confirmation is the only path that grants purchase value — Approved (2026-11-06); amended 2026-11-06 (A1: device-bound member QR; A1 addendum: Wallet pass counts as a device)
+## PD-003 — Staff confirmation is the only path that grants purchase value — Approved (2026-11-06); amended 2026-11-06 (A1: device-bound member QR; A1 addendum: Wallet pass counts as a device); amended 2026-11-12 (A2: system stamp-restore correction inside a void)
 
 Context: the approved brief requires two capture methods: Method A (customer
 scans the branch QR) and Method B (staff scans the customer's rotating QR).
@@ -148,9 +149,10 @@ Consequences:
   among open claims at that branch.
 - The cashier must **type** the code; there is no pick-from-a-list
   confirmation. A wrong code is rejected; repeated wrong codes on the same claim
-  cancel it (default 3 attempts — proposed starting value).
+  cancel it (3 attempts — approved and platform-fixed by PD-020).
 - The staff member always enters the bill amount; the customer never does.
-- Claims expire (default 15 min); one open claim per customer per branch.
+- Claims expire (15 min — approved and platform-fixed by PD-020); one open
+  claim per customer per branch.
 
 *No manual lookup*
 - The cashier cannot find a customer by typing a phone number (MVP). If the
@@ -208,6 +210,33 @@ to time, and each code is single-use on the server and bound to
 {customer, pass, café}. A pass code is for earning only; redemption starts from
 the web app. No static barcode is ever accepted.
 
+### Amendment A2 — 2026-11-12: system stamp-restore correction inside a void
+
+Context: PD-008 A1 found that voiding a purchase that issued a stamp reward
+leaves the card short unless the card reset is put back. Putting it back is a
+manual adjustment, which *Scope* above reserves to the owner ("Manual
+adjustments are owner-only; the cashier cap stays at 0").
+
+Decision: one narrow exception to that rule — the **system stamp-restore
+correction** defined in PD-008 A1.
+
+Consequences:
+- It runs only as a step of a void that PD-008 A1 permits. No endpoint, screen
+  or role can request it outside that workflow, and no person enters its
+  amount.
+- Its amount is k × threshold, computed by the system from the saved void plan
+  (PD-008 A1). It is classified `correction`, has `qualifies_for_tier: false`,
+  carries a reason linked to the void id and the business id
+  `void-<void id>-restore`.
+- It is audited with actor = system, plus the staff member, device and branch
+  that started the void.
+- It is not a cashier manual adjustment: the cashier cap stays 0 and the
+  cashier role gains no adjustment permission.
+- Owner stamp adjustments outside a void stay owner-only and follow the balance
+  range rule in PD-008 A1.
+
+Date / approved by: 2026-11-12, project owner.
+
 ## PD-004 — Customer authentication: phone OTP run by our BFF — Approved (2026-11-06, conditional)
 
 Context: LIP does not authenticate customers (G-06). Options considered:
@@ -257,7 +286,7 @@ Consequences:
 - Node's built-in `crypto` only; no hand-rolled primitives.
 - Task 5.1 (security review) explicitly covers the OTP and session code.
 
-*Abuse limits* (proposed starting values)
+*Abuse limits* (approved by PD-020 as platform-fixed values)
 - Egyptian mobile numbers only (`+20 1x…`); 6-digit code valid 5 min; resend
   cooldown 60 s; per phone ≤ 5 sends/hour and ≤ 10/day; ≤ 5 wrong attempts per
   code; per-IP and per-device limits.
@@ -296,7 +325,7 @@ Consequences:
 
 Date / approved by: 2026-11-06, project owner.
 
-## PD-005 — Billing provider: Kashier — Approved (2026-11-06); amended 2026-11-06 (A1: manual billing at launch, Kashier deferred)
+## PD-005 — Billing provider: Kashier — Approved (2026-11-06); amended 2026-11-06 (A1: manual billing at launch, Kashier deferred); amended 2026-11-12 (A2: subscription stage permissions)
 
 Context: upstream LIP ships Stripe only; Stripe does not onboard
 Egyptian-resident businesses directly.
@@ -363,7 +392,8 @@ Consequences:
    test (now in task 2.4), and the pilot (5.6).
 
 Follow-ups approved 2026-11-06:
-7. Three stages after the period end date (proposed defaults):
+7. Three stages after the period end date (proposed defaults; day ranges
+   approved by PD-020, permissions per stage refined by A2 below):
    1. **Grace**, days 1–7: everything works normally.
    2. **Read-only**, days 8–37: the owner cannot change program, campaigns or
       staff. Cashiers keep awarding and redeeming.
@@ -384,6 +414,57 @@ Follow-ups approved 2026-11-06:
     (reward earned, reward expiring) still go out.
 
 Date / approved by: 2026-11-06, project owner.
+
+### Amendment A2 — 2026-11-12: subscription stage permissions
+
+Context: follow-up 7 named the three stages but not exactly which actions each
+stage allows, and did not say how our stages relate to LIP Cloud's own states.
+Facts from code (2026-11-12, source read only, not executed): a Cloud
+environment with status `suspended` refuses every request
+(`apps/cloud/src/managed-data-plane.ts`); Cloud usage recording returns 402
+unless the subscription status is `active` or `trialing`
+(`apps/cloud/src/service.ts`).
+
+Decision: follow-up 7 is amended with this permission table. Stage days are
+Cairo calendar days (PD-007) counted from the period end date: grace days 1–7,
+read-only days 8–37, suspended day 38 onward (PD-020).
+
+| Action | Grace | Read-only | Suspended |
+| --- | --- | --- | --- |
+| Accrue a purchase / confirm a pending claim | ✓ | ✓ | ✗ |
+| Redeem a reward | ✓ | ✓ | ✓ |
+| Void a purchase, including the stamp restore (PD-008 A1) | ✓ | ✓ | ✓ |
+| Owner adjustment classified `correction` or `service_recovery` | ✓ | ✓ | ✓ |
+| Owner adjustment classified `bonus` or `gift` | ✓ | ✗ | ✗ |
+| Owner adjustment classified `migration` (owner-only; never a bypass for `correction` / `service_recovery`) | ✓ | ✗ | ✗ |
+| Revoke staff, devices or sessions | ✓ | ✓ | ✓ |
+| Add staff, publish or change the program, campaigns | ✓ | ✗ | ✗ |
+| A new customer joins the café | ✓ | ✓ | ✗ |
+| Rotate a leaked Branch QR (security action) | ✓ | ✓ | ✓ |
+
+Consequences:
+- Blocking new joins in the suspended stage is an approved exception to PD-001
+  rule 2 for that café only.
+- Revoking access and correcting mistakes are never blocked, so a café that
+  stops paying can still remove a former employee and fix a wrong award.
+- The stage is computed and enforced in our layer (BFF). It must never be
+  implemented with Cloud environment suspension, a Cloud subscription status
+  other than `active`/`trialing`, or LIP write-freeze, because each of those
+  would also stop redemptions, voids and revocations. The Cloud subscription
+  stays `active` while our stage engine runs; how this is kept in sync is
+  decided in task 5.5.
+- Branch QR rotation is a security action, like revocation, and is allowed in
+  every stage.
+- The `migration` adjustment classification (balance import) stays
+  owner-only (PD-003) and is allowed in grace only; it is blocked in
+  read-only and suspended (approved 2026-11-12). It is never a bypass:
+  legitimate corrections and service recovery use `correction` and
+  `service_recovery`, which stay allowed in every stage.
+- Recording a payment restores full service immediately (unchanged).
+- Needs executable verification (task 5.5): that the Cloud mapping above holds
+  at runtime on the pinned commit.
+
+Date / approved by: 2026-11-12, project owner.
 
 ## PD-006 — Hosting split and Postgres provider — Approved (2026-11-06, conditional)
 
@@ -487,7 +568,7 @@ Domain name (~$1/month) and messaging (WhatsApp/SMS) are not included.
 
 Date / approved by: 2026-11-06, project owner.
 
-## PD-007 — Arabic-first, English second — Approved (2026-11-06)
+## PD-007 — Arabic-first, English second — Approved (2026-11-06); clarified 2026-11-12 (C1: expiry moments)
 
 Context: the brief requires Arabic + English with RTL as first class (G-14).
 LIP has no localization: `ProgramDefinition.name/description` and
@@ -548,7 +629,27 @@ Consequences:
 
 Date / approved by: 2026-11-06, project owner.
 
-## PD-008 — Purchase capture: bill amount only (roadmap task 0.6) — Approved (2026-11-06)
+### Clarification C1 — 2026-11-12: expiry moments computed by LIP
+
+Context: the *Time* rule above says day-based business rules, including
+expiry, use `Africa/Cairo`. Facts from code (2026-11-12, source read only):
+LIP computes point expiry as earn time + days × 24 hours, an exact moment in
+UTC, not the end of a Cairo calendar day; stamps have no expiry
+(`packages/reference/src/engine.ts`).
+
+Decision (clarification, not a change of intent):
+- Point and reward expiries computed by LIP are exact moments. The product
+  shows them as date **and time** in `Africa/Cairo` (for example "expires 12
+  Nov 2027, 3:40 pm"), never as a date alone, so a customer is never told a
+  later day than LIP will honour.
+- Stamps never expire (PD-012, PD-020).
+- Day-based rules that our own layer computes (subscription stages, inactivity
+  checks, send windows, birthdays) keep using Cairo calendar days.
+- No fork patch changes LIP's expiry arithmetic.
+
+Date / approved by: 2026-11-12, project owner.
+
+## PD-008 — Purchase capture: bill amount only (roadmap task 0.6) — Approved (2026-11-06); amended 2026-11-12 (A1: void with automatic stamp restore)
 
 Context: small cafés have no POS integration (G-04). Facts from code
 (2026-11-06): LIP earning exclusions are item-based (`excluded_product_ids`,
@@ -580,7 +681,7 @@ Consequences:
 - The confirm screen shows the amount and the points/stamps it will earn; the
   preview comes from LIP `orders/evaluate`, never from client-side math.
 
-*Typing mistakes* (proposed defaults)
+*Typing mistakes* (approved by PD-020: threshold 2,000 EGP, café setting)
 - Each café sets a "large bill" threshold (default 2,000 EGP). Above it the
   cashier must type the amount a second time. Above 5 × the threshold the amount
   is rejected; only the owner can award it, as a classified adjustment.
@@ -588,27 +689,190 @@ Consequences:
 *Fixing a wrong amount*
 - The same staff member can void their own purchase within 10 minutes: a full
   clawback on the same `order_id` through `orders/adjust` (audited), then
-  re-record. A void never grants value (consistent with PD-003).
-- If the voided purchase crossed a stamp threshold and LIP issued a reward for
-  it, the void also cancels that reward through `issued-rewards/cancel` when it
-  is still unredeemed. These are two LIP calls, not one database transaction:
-  the BFF runs them as one void operation with idempotency keys derived from the
-  void id, cancel first, so a retry completes both and never double-applies.
-- If that reward was already redeemed, the cashier's void is blocked; only the
-  owner can resolve it (task 3.6).
+  re-record. A void never grants new purchase or tier value (consistent with
+  PD-003); the only stamps it adds back are the tightly scoped system
+  stamp-restore correction of PD-003 A2, which returns stamps the purchase's
+  card reset had removed.
+- *(amended by A1)* If the voided purchase crossed a stamp threshold and LIP
+  issued a reward for it, the void also cancels that reward through
+  `issued-rewards/cancel` when it is still unredeemed. These are two LIP calls,
+  not one database transaction: the BFF runs them as one void operation with
+  idempotency keys derived from the void id, cancel first, so a retry completes
+  both and never double-applies.
+- *(amended by A1)* If that reward was already redeemed, the cashier's void is
+  blocked; only the owner can resolve it (task 3.6).
 - After 10 minutes, or for another staff member's purchase, only the owner can
   correct it (task 3.6).
 - Task 3.6 must check and record how LIP's stamp reset / balancing adjustment
-  behaves when an order that crossed the threshold is adjusted.
+  behaves when an order that crossed the threshold is adjusted. *(Answered at
+  source level by A1; task 3.6 still confirms it with executable tests.)*
 
 *Redeeming free-item rewards*
 - The cashier hands over the item; the reward runs reserve → capture
   (PD-003). Its `product_ids` / `category_ids` are descriptive only in the MVP.
 - Task 3.4 must check whether LIP allows reserve/capture against a synthetic
   order with no item lines, or without an order. If not, raise a new decision;
-  do not patch around it.
+  do not patch around it. *(Answered at source level by A1: a zero-value
+  synthetic order with one line is valid; task 3.4 still confirms it with
+  executable tests.)*
 
 Date / approved by: 2026-11-06, project owner.
+
+### Amendment A1 — 2026-11-12: void with automatic stamp restore (Option A)
+
+Context — facts from source inspection on 2026-11-12 (pinned commit; source
+read only, **not executed**):
+- In stamp programs LIP issues ⌊balance / threshold⌋ rewards when stamps are
+  accrued and resets the card by that many thresholds
+  (`packages/reference/src/engine.ts`, reset-mode issuance). The reset ledger
+  entries carry no `order_id`, so they are not reversed when the order is
+  voided.
+- A void claws back exactly the stamps that order earned, minus earlier
+  adjustments to it; it is not capped at the current balance, and the ledger
+  has no balance floor, so the card can go negative.
+- Cancelling the issued reward does not give the stamps back. Manual
+  adjustments never issue rewards.
+- So the original wording ("cancel the reward, then void") leaves the card
+  short or negative whenever the voided purchase triggered a reset.
+- A zero-value order with one line is valid
+  (`packages/protocol/src/validation.ts`); orders need at least one line.
+
+Decision: **Option A — automatic compensating restore.** This replaces the
+second and third bullets of *Fixing a wrong amount* above.
+
+Scope:
+- Stamp programs only. Cards always reset on issue (PD-012). Every stamp
+  clawback — a cashier void, an owner void, an owner full refund — uses this
+  algorithm.
+- Points programs only claw back points; no reward is cancelled and no restore
+  runs.
+
+*Purchase record (kept by the BFF for every stamp purchase)*
+- The reward marker: the highest stamp-reward sequence number already issued
+  to that member before the purchase.
+- The balance before and after the purchase, the threshold t, and the program
+  revision.
+- **The authoritative stamps-earned amount `a`, taken from the accrual
+  result LIP returned for this purchase and stored with the record.** The void
+  plan always reads `a` from this record; it is never recomputed from the
+  current program settings, which may have changed since the purchase.
+
+*Plan* (computed once, saved, then replayed — never recomputed)
+- a = stamps the purchase earned; cur = current card balance.
+- k = max(0, ⌈(a − cur) / t⌉) rewards must be cancelled; restore = k × t
+  stamps. The final balance is cur + k × t − a, which always lies in [0, t).
+- Candidates: rewards named `stamp-<member>-<n>` with n above the purchase's
+  marker, status `issued`, and no active reservation. Any k candidates are
+  correct; the newest are chosen first.
+
+*Preconditions* — if any fails, the void is blocked and goes to the owner:
+1. A cashier void: same staff member and within 10 minutes (unchanged).
+2. The program has not been republished since the purchase.
+3. 0 ≤ cur < t.
+4. No other void is in progress for that member.
+5. At least k candidate rewards exist.
+
+*Steps* (one void operation, per-member lock, every LIP call idempotent)
+1. Cancel each chosen reward through `issued-rewards/cancel`, key
+   `void:<void id>:cancel:<reward id>`.
+2. Void the order through `orders/adjust`, adjustment id `void-<void id>`.
+3. If k > 0, post the system stamp-restore correction of k × t stamps (PD-003
+   A2), adjustment id `void-<void id>-restore`.
+
+*Recovery*
+- Forward-only: after a crash or error, use the persisted step plan, exact
+  request bodies and stable business IDs to verify each uncertain effect in
+  authoritative LIP records. A call may have succeeded before the BFF saved
+  its result; confirm it or retry idempotently with the same identifiers,
+  never create a second effect or recompute the plan. Nothing is rolled back.
+- Automatic retries for 15 minutes; then the void is marked *needs owner*.
+  The owner either retries it or settles it with a `correction` adjustment.
+  Still open after 24 hours → escalated to the Super Admin. Recovery actions,
+  reconciliation evidence and decisions are audited; operational alerts
+  continue while the case remains unreconciled.
+- A void may become terminal only after reconciliation verifies all expected
+  reward cancellations, order clawback and, when required, stamp restore
+  against authoritative LIP reward and ledger records, including any owner
+  settlement. This requirement applies equally to owner and Super Admin
+  resolution. Only successful reconciliation clears the durable member flag;
+  no force-close or administrative override can clear it while ledger or
+  reward inconsistencies remain. Unreconciled cases stay blocked and escalated
+  for audited recovery.
+- Customer deletion (PD-001 rule 8) is queued while a void is in progress for
+  that member.
+
+*Safeguards* (C1–C8, the counterexamples from the 2026-11-12 stress test;
+each needs a test in task 3.6)
+- **C1 — some candidate rewards are redeemed or reserved, others are free.**
+  Choosing the "k most recent" would pick a blocked one and fail needlessly.
+  Safeguard: cancel any k cancellable stamp rewards issued since the
+  purchase; block only if fewer than k are cancellable.
+- **C2 — an owner gift reward.** "Most recent" could cancel the owner's gift
+  instead of a stamp-backed reward. Safeguard: only ids matching
+  `stamp-<member>-<n>` are candidates; owner gifts use ids that never start
+  with `stamp-`, and the BFF never issues a `stamp-` id (an id clash makes the
+  engine fail the purchase or silently reuse the reward).
+- **C3 — finding "rewards since the purchase" by timestamp.** Same-millisecond
+  rewards or gifts could slip in. Safeguard: at purchase time, under the
+  member lock, record the highest stamp-reward number (the marker); candidates
+  are rewards numbered above it.
+- **C4 — crash after the void step, then a retry that recomputes.** The
+  balance has already dropped, so a recomputed k would restore too many
+  stamps. Safeguard: save the whole plan (cur, a, t, k, chosen reward ids,
+  exact request bodies) before the first call and replay it, never recompute.
+  The manual-adjustment body must match byte for byte, or a retry is rejected
+  as a conflict.
+- **C5 — a balance outside [0, t).** Causes: an owner stamp adjustment, a
+  stamp clawback that bypasses the algorithm, or a threshold changed by a
+  republish. Safeguards: preconditions 2 and 3 above; every stamp clawback by
+  anyone uses this algorithm; **an owner stamp adjustment outside a void must
+  leave the balance in [0, t) — the BFF rejects an adjustment that would
+  leave that range (manual adjustments never issue rewards)**; reset mode
+  stays fixed on.
+- **C6 — redeeming a stamp reward without its issued reward.** Reserve
+  charges the catalogue cost, which may be 0. Safeguard: stamp rewards are
+  reserved only with `issued_reward_id`, and the reward's direct cost is set
+  to t (PD-012).
+- **C7 — a reservation past its expiry but never reversed.** The stored
+  "reserved" status can block cancel until something else triggers expiry.
+  Safeguard: the BFF reverses any redemption it abandons (hold per PD-020);
+  a void blocked this way retries after the hold time, then goes to the owner.
+  Needs an executable test (check (a) below).
+- **C8 — any other balance-changing operation for the same member runs
+  between void steps.** It changes cur or uses up a chosen reward.
+  Safeguard: one per-member lock covers **every operation that can change the
+  member's stamp balance or rewards**: purchases, redemptions, voids, owner
+  adjustments of any classification, and campaign, automation or import
+  grants. A durable "void in progress" flag (saved with the plan) makes the
+  BFF refuse each of them for that member with a clear "void in progress"
+  error until the flag clears. Only the void's own steps and the owner's
+  settlement of a *needs owner* void (see *Recovery*) bypass it.
+  The flag clears only after the reconciliation in *Recovery* succeeds. An
+  unresolved void is *needs owner* after 15 minutes and escalates to the Super
+  Admin after 24 hours; escalation or administrative closure alone never clears
+  the flag. The block is per member only; other customers are not affected.
+
+*Redemption-only visits*
+- A customer who redeems without buying gets a synthetic zero-value order in
+  its own `order_id` namespace. It is never accrued.
+- The minimum eligible spend is at least 1 piaster (PD-012), so a zero-value
+  order can never earn.
+
+*Verification status* — the design above is an approved product requirement.
+These technical behaviours are **not yet verified by execution** and must be
+proven on Linux with PostgreSQL 17 before task 3.6 is done:
+- (a) whether a stale stored "reserved" status blocks `issued-rewards/cancel`
+  (C7);
+- (b) whether idempotency records and lazily applied expiry are persisted in the
+  same commit;
+- (c) serialization through Cloud's managed data plane;
+- (d) crash recovery and the per-member lock;
+- (e) fixed-format member ids, so `stamp-<member>-<n>` parsing cannot be
+  confused;
+- (f) characterization tests that pin the engine's `stamp-<member>-<n>` and
+  `-reset` naming, so an upstream change is detected.
+
+Date / approved by: 2026-11-12, project owner.
 
 ## PD-009 — Wallet loyalty passes (Google Wallet first) — Approved (2026-11-06, conditional)
 
@@ -702,6 +966,215 @@ Consequences:
     users use the web-app card (offline per PD-003 A1).
 
 Date / approved by: 2026-11-06, project owner.
+
+## PD-010 — Owner, Super Admin and staff sign-in — Approved (2026-11-12)
+
+Context: PD-004 covers customer sign-in only. Owners, the Super Admin and
+staff need their own rules before Phase 2.
+
+Decision:
+- **Owner:** phone number + OTP through the PD-004 OTP service. Session 30 days,
+  sliding. A fresh OTP is required to create or deactivate staff, publish the
+  program, post a manual adjustment, or change the owner's phone number.
+- **Super Admin:** OIDC sign-in with MFA enforced by the identity provider. We
+  store no Super Admin passwords. The provider is chosen in task 2.2 and must be
+  zero-cost or fit the PD-006 budget.
+- **Staff:** PIN on a registered branch device (task 2.6).
+
+Consequences:
+- Every session (customer, staff, owner, Super Admin) can be revoked.
+- Cookies are host-only with the `__Host-` prefix, one per subdomain.
+- PD-004's "no outside identity provider" applies to customer sign-in only; the
+  Super Admin OIDC provider does not conflict with it.
+- **Depends on task 0.11** for live OTP delivery to real owner numbers (sender
+  registration, Meta verification).
+
+Date / approved by: 2026-11-12, project owner.
+
+## PD-011 — Café onboarding by invitation — Approved (2026-11-12)
+
+Context: Cloud invitations are email-only and cannot grant the owner role
+(`apps/cloud/src/types.ts`, source read 2026-11-12).
+
+Decision:
+- The Super Admin provisions each café through Cloud: operator tools in P0, the
+  console UI in task 6.7.
+- The owner receives a single-use invite bound to the owner's phone number,
+  valid 72 hours, stored hashed in our layer (not a Cloud invitation).
+- The owner accepts the invite, signs in by OTP, and then sets up the program.
+
+Consequences:
+- Self-serve café sign-up is P1 (backlog).
+- Task 1.4's "first-stamp time" is measured from invite acceptance.
+- **Depends on task 0.11** for live delivery of invites and OTPs to real
+  numbers.
+
+Date / approved by: 2026-11-12, project owner.
+
+## PD-012 — Loyalty program rules for P0 — Approved (2026-11-12)
+
+Decision:
+- One active program per café, either stamps or points. The type is locked
+  after the first publish (LIP also forbids changing the primary unit after
+  publish).
+- Stamp programs: `reset_on_issue` is always true; the stamp reward's direct
+  cost equals the threshold t; stamp rewards are reserved only through their
+  issued reward (PD-008 A1).
+- Minimum eligible spend is at least 1 piaster, so a zero-value order never
+  earns.
+- Expiry follows PD-020. Stamps never expire.
+- Publishing or changing the program is blocked in the read-only and suspended
+  stages (PD-005 A2).
+
+Consequences:
+- Several programs per café go to the backlog.
+- The program wizard (task 3.7) offers only these options.
+
+Date / approved by: 2026-11-12, project owner.
+
+## PD-013 — Customer data visible to cafés — Approved (2026-11-12; legal confirmation pending in task 0.10)
+
+Decision:
+- **Owner** sees each customer's first name, card progress, visit history and
+  the last 3 digits of the phone number. Search is by first name plus last 3
+  digits only.
+- **Cashier** sees first name and card progress only.
+- No customer export in P0.
+- No personal data is written to LIP's `/platform/v1` customer records
+  (`packages/server/src/customer-data.ts`); the customer directory (G-01) is the
+  only store.
+- Every Super Admin read of customer directory data is audited with a reason.
+
+Consequences:
+- **Depends on task 0.10:** the legal opinion must confirm showing the last 3
+  digits to owners and the owner search. If it does not, this decision reopens.
+
+Date / approved by: 2026-11-12, project owner.
+
+## PD-014 — Roles and where permissions are enforced — Approved (2026-11-12)
+
+Context: on `/lip/v1` the server checks only the permission; `protocol:write`
+covers every write, including manual adjustments, and a key's
+`allowed_location_ids` is not enforced there (`packages/server/src/server.ts`,
+source read 2026-11-12, not executed).
+
+Decision:
+- P0 roles: Super Admin, Owner, Cashier, Customer. Branch Manager is P1.
+- The BFF enforces every product permission. Tenant and branch always come from
+  the session or registered device, never from the request body.
+- An owner awards or redeems only through a staff session on a registered
+  device.
+- One owner per café.
+
+Consequences:
+- The cashier fork patch to `access-control.ts` (G-05) becomes optional; it is
+  made only if a later task needs it, and logged in `07-fork-patches.md`.
+- Task 2.5 proves cross-branch and cross-tenant denial with tests.
+
+Date / approved by: 2026-11-12, project owner.
+
+## PD-015 — Rewards in P0 — Approved (2026-11-12)
+
+Decision:
+- Rewards are free items only. Discount rewards are P1.
+- At most one reward per order, enforced by the BFF with a unique constraint
+  (concurrent attempts included).
+- A redemption never takes a balance below zero. A clawback (void, refund) may.
+
+Consequences:
+- Free-item redemptions write no ledger entry in LIP, so "rewards redeemed"
+  reports count reservation (capture) records, not ledger entries.
+- Reward stacking goes to the backlog.
+
+Date / approved by: 2026-11-12, project owner.
+
+## PD-016 — Messaging in P0 — Approved (2026-11-12)
+
+Decision:
+- P0 sends OTP messages only. Marketing consent is still captured at sign-up so
+  later campaigns can use it.
+- The customer app shows balances that will expire soon (instead of a message).
+
+Consequences:
+- Transactional and marketing messages stay in their later tasks.
+- **Depends on task 0.11** for live delivery (sender registration, Meta
+  verification).
+
+Date / approved by: 2026-11-12, project owner.
+
+## PD-017 — Billing scope in P0 — Approved (2026-11-12)
+
+Decision:
+- The manual billing core (task 5.5) is P0: payment records, set/extend the
+  period, and the automatic stage engine.
+- Stages and their permissions follow PD-005 A2.
+- The owner sees the plan, end date and current stage in P0. The renewal
+  reminder stays in task 6.2.
+
+Date / approved by: 2026-11-12, project owner.
+
+## PD-018 — Owner dashboard scope in P0 — Approved (2026-11-12)
+
+Decision:
+- The 8 dashboard pages planned in task 4.4.
+- The plan, end date and stage are shown on Overview and Settings.
+- The "rewards redeemed" KPI counts reservation (capture) records (PD-015).
+
+Date / approved by: 2026-11-12, project owner.
+
+## PD-019 — Support and corrections — Approved (2026-11-12; legal and messaging dependencies pending)
+
+Decision:
+- Support is a platform WhatsApp number with a phone fallback, on a number
+  separate from the OTP and marketing senders.
+- Balances are corrected only through voids (PD-008 A1) or owner adjustments
+  with a classification (PD-003); support staff never change balances.
+- Task 1.2 writes the recovery procedures: customer account recovery, and owner
+  recovery (out-of-band identity check, revoke all sessions, audited).
+- A ticketing system is P1.
+
+Consequences:
+- **Depends on task 0.10:** support chats are held by a provider outside Egypt.
+- **Depends on task 0.11:** the support number needs Meta business
+  verification.
+
+Date / approved by: 2026-11-12, project owner.
+
+## PD-020 — Operational defaults — Approved (2026-11-12)
+
+Context: `04-business-rules.md` listed many values as "proposed starting
+values". These are now approved. "Café setting" means the owner can change it
+within the stated range; "platform-fixed" means only we can.
+
+| Setting | Approved value | Who can change it |
+| --- | --- | --- |
+| Pending claim lifetime / attempts | 15 minutes / 3 attempts | platform-fixed |
+| OTP | 6 digits, valid 5 min, resend after 60 s, 5 sends/hour and 10/day per number, 5 wrong attempts; plus IP/device limits, Turnstile and the circuit breaker (PD-004) | platform-fixed |
+| Large-bill threshold | 2,000 EGP; re-type above it; reject above 5 × | café setting |
+| Void window | 10 minutes | platform-fixed |
+| Rewards per order | 1 | platform-fixed (PD-015) |
+| Reward expiry | 30 days after issue | café setting, 7–90 days |
+| Point expiry | 365 days after earning | café setting: 180, 365, 545 or 730 days, or never |
+| Point expiry warning | `warning_days: [30]` | platform-fixed |
+| Stamp expiry | never | platform-fixed |
+| Minimum eligible spend | 1 piaster | café setting, never below 1 piaster |
+| Earn-rate suggestion (points) | 5 points per 100 EGP | wizard suggestion only |
+| Subscription stages | grace days 1–7, read-only 8–37, suspended 38+ (Cairo days) | platform-fixed (PD-005 A2) |
+| Owner session | 30 days, sliding (PD-010) | platform-fixed |
+| Customer session | 90 days, sliding (PD-004) | platform-fixed |
+| Owner invite | 72 hours, single-use (PD-011) | platform-fixed |
+| Reward reservation hold | 120 seconds, then the BFF reverses it | platform-fixed |
+| Void retries | 15 minutes, then *needs owner*; Super Admin after 24 hours | platform-fixed |
+| Phone digits shown to owner | last 3 (PD-013; task 0.10) | platform-fixed |
+
+Point expiry restrictions:
+- "Never" versus "expiring" is locked after the café's first purchase.
+- A change of duration applies only to points earned after the change; LIP
+  keeps existing point lots as they are.
+- A void consumes the soonest-expiring points first (LIP behaviour; accepted).
+- Expiry is shown as date and time in Cairo (PD-007 C1).
+
+Date / approved by: 2026-11-12, project owner.
 
 ---
 
