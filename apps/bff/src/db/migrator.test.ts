@@ -100,12 +100,15 @@ live("migration runners against a live PostgreSQL", () => {
   const pools: Pool[] = [];
   const newPool = (): Pool => {
     const pool = new Pool({ connectionString: withDatabase(adminUrl!, databaseName), max: 2 });
+    // An idle client whose backend is terminated (database drop) must not become an uncaught exception.
+    pool.on("error", () => undefined);
     pools.push(pool);
     return pool;
   };
 
   beforeAll(async () => {
     admin = new Pool({ connectionString: adminUrl!, max: 1 });
+    admin.on("error", () => undefined);
     await admin.query(`CREATE DATABASE ${databaseName}`);
     db = newPool();
     directory = await mkdtemp(join(tmpdir(), "bff-migrations-live-"));
@@ -194,6 +197,7 @@ live("migration runners against a live PostgreSQL", () => {
     expect(tables.rows.map((row) => row.relname)).toEqual(["bff_schema_migrations", "directory_schema_migrations"]);
     // The two targets must not contend on one lock: hold the bff lock and migrate the directory target.
     const holder = await newPool().connect();
+    holder.on("error", () => undefined);
     try {
       await holder.query("BEGIN");
       await holder.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [MIGRATION_TARGETS.bff.lockKey]);
