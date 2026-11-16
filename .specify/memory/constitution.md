@@ -90,11 +90,23 @@
 5. Never deploy or modify production data without explicit user authorization.
 6. Preserve all unrelated working-tree changes.
 
+### Article XI — Evolvability & Backward Compatibility
+1. LIP MUST remain scalable, extensible, maintainable and backward-compatible as new features, tenants, branches and integrations are introduced.
+2. Every implementation MUST identify its impact on modules, APIs, database schemas, contracts and existing behaviour. It MUST prefer cohesive modules with stable interfaces and explicit boundaries, and MUST avoid speculative abstractions and premature microservices.
+3. Existing contracts, persisted data and approved behaviour MUST remain compatible unless the owner explicitly approves a breaking change together with a migration plan. Database evolution MUST preserve existing data (Article VI).
+4. Every change MUST:
+   - protect the invariants of Articles IV–VI and VIII;
+   - carry regression, integration and contract tests for the affected existing behaviour (Article VII);
+   - assess performance and operational impact where applicable;
+   - document compatibility assumptions, failure modes and rollback or recovery.
+5. A change that risks breaking approved behaviour without an authorized mitigation MUST stop and be escalated. The operational procedure is in `.agents/rules/01-architecture-and-upstream.md` §5 and `.agents/rules/05-implementation-task-quality.md` field 13.
+
 ## Governance
 This Constitution is the binding engineering charter for this repository. Operational agent instructions live in [`AGENTS.md`](../../AGENTS.md) and [`.agents/rules/`](../../.agents/rules/). When any generated template or generic skill instruction conflicts with this Constitution or Approved decisions in [`docs/context/01-decisions.md`](../../docs/context/01-decisions.md), this Constitution and `01-decisions.md` prevail.
 
 ## Amendment History
+- **v1.2.0 (2026-11-13)**: Added Article XI (Evolvability & Backward Compatibility) at the project owner's request. Articles I–X are unchanged. The owner confirmed Article XI and v1.2.0 on 2026-11-13 (`docs/context/01-decisions.md` PD-042); Articles I–X and the approval hierarchy are preserved.
 - **v1.1.0 (2026-11-08)**: Amended Article IX and Governance to establish the curated Matt Pocock Skills suite under `.agents/skills/` (`grill-with-docs`, `to-spec`, `to-tickets`, `implement`, `tdd`, `code-review`, `diagnosing-bugs`, configured via `docs/agents/domain.md` and `docs/agents/issue-tracker.md`) as the default day-to-day Spec-Driven workflow and GitHub Spec Kit (`/speckit-*`) as an optional workflow for large, complex features, while preserving all mandatory Tier 2 and Tier 3 approval gates, no-auto-commit rules, and Articles I–VIII & X unchanged.
 - **v1.0.0 (2026-11-08)**: Initial ratification of the 10-article LIP & Egypt Loyalty SaaS Engineering Constitution.
 
-**Version**: 1.1.0 | **Ratified**: 2026-11-08 | **Last Amended**: 2026-11-08
+**Version**: 1.2.0 | **Ratified**: 2026-11-08 | **Last Amended**: 2026-11-13

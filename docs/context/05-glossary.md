@@ -2,7 +2,7 @@
 
 | Arabic (as used in chat) | Our term | LIP term / code |
 | --- | --- | --- |
-| الكافيه / البراند / صاحب العمل | Business | `tenant_id` (+ `brand_id`, `merchant_id` on orders) |
+| الكافيه / البراند / صاحب العمل | Business (also "merchant" or "tenant"; any business category, pilot cafés and restaurants, PD-001 A1) | `tenant_id` (+ `brand_id`, `merchant_id` on orders) |
 | الفرع | Branch | `location_id` (`packages/server/src/locations.ts`) |
 | صاحب الكافيه | Owner | `TenantRole: owner` |
 | الكاشير / الموظف | Staff / Cashier | no dedicated LIP role (gap G-05); permissions enforced by the BFF (PD-014) |
@@ -81,4 +81,5 @@
 | مجموعة فرع الاكتساب | Acquisition-branch cohort | ours: customers grouped by the branch of their first café visit, for the branch-filtered repeat rate; labelled separately from branch activity (PD-038 P5) |
 | شراء صفري الاستحقاق مُتحقَّق منه | Verified zero-accrual purchase | ours: a purchase whose own accrual entry, found by an authoritative and complete read of LIP's ledger, shows 0 points; the only kind a void may close without a points reversal; anything less certain fails closed (PD-038 P8) |
 | [Product] | Product name placeholder | temporary name used until the final Arabic/Latin name is approved (PD-029) |
+| ونيس | Wanees | ours: provisional **working** product name (PD-043). It is not final, not legally cleared, and does not satisfy PD-029; it never appears in contracts, identifiers or business logic |
 | مرجع | Reference package | an upstream part we read but do not ship (e.g. upstream Admin, wallet) |
