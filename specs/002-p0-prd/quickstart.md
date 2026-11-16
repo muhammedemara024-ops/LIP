@@ -82,3 +82,48 @@ The stack runs under compose: Postgres, Cloud data plane, BFF and web *(compose 
 
   Until then, no points café joins the pilot.
 - **Other gates.** Legal task 0.10 and company registration task 0.11.
+
+## 6. Implementation entry evidence record (T001, BE-8) — 2026-11-16
+
+**Scope.** This is a dated documentation record produced by task T001 under the owner's implementation authorization of 2026-11-16 (T001 and T002 only; recorded in the `tasks.md` Status block). It is evidence, not approval. It authorizes no other task, closes no gate other than recording T001's own output (BE-8), resolves no open decision (OD-01–OD-18) and does not authorize FP-003. Nothing below marks unfinished work done. Source-read claims are distinguished from execution: **no application feature test was written or executed for this record; only the repository checks listed under "Verification of this record" were run**.
+
+**Backend-entry conditions BE-1–BE-7** (source: `backend-first-amendment.md` §5.1, read 2026-11-16):
+
+| ID | Condition | Evidence reference | Recorded status |
+| --- | --- | --- | --- |
+| BE-1 | PRD v1.0 Gate 1 approved | `docs/context/06-roadmap.md` task 1.1; commit `3016954` | met |
+| BE-2 | Phase 2 gate: tasks 0.7 and 0.8 passed (PD-002) | `docs/context/06-roadmap.md` tasks 0.7/0.8 (2026-11-07 Linux `node:22.22.0` baseline: 62/62 files, 479/479 tests, 0 failed, 0 skipped; `lip doctor` PASS 3/3, `lip test` PASS 5/5). The 0.7/0.8 engineering baseline is retained as recorded, not re-run here. | met |
+| BE-3 | Journeys 1.2, 1.3 (a), 1.4 (a) accepted as conditional drafts | PD-045 item 2; roadmap 1.2–1.4 | met |
+| BE-4 | Gate 2 (scoped) approved | `tasks.md` Status (2026-11-13; revised 2026-11-15) | met |
+| BE-5 | Feature checklist run plus explicit owner disposition of CHK001–CHK082 | `checklists/entry-gate-assessment.md` §G (owner disposition approved 2026-11-15) | met for run/disposition only; original item statuses, evidence and named gates preserved |
+| BE-6 | PD-047 approved and recorded; revised Gate 2 approved | `docs/context/01-decisions.md` PD-047; `tasks.md` Status (2026-11-15) | met |
+| BE-7 | Independent review of the amendment plus the separate independent review | `backend-first-amendment.md` §5.1; PD-048 item 6 | met 2026-11-16 |
+
+**BE-8** is this record. It is T001's own output and was never an entry condition of T001.
+
+**Roadmap Phase 1 items — recorded status, none upgraded** (source: `docs/context/06-roadmap.md` Phase 1 table):
+
+| Item | Recorded status |
+| --- | --- |
+| 1.1 PRD v1.0 | Gate 1 approved 2026-11-12 |
+| 1.2 Customer journey | Accepted 2026-11-13 as a conditional draft (PD-045); open decisions preserved |
+| 1.3 Cashier journey | (a) accepted 2026-11-13 as a conditional draft; (b) **NOT RUN**, awaiting T085 and F-11/JG-11 |
+| 1.4 Owner onboarding | (a) accepted 2026-11-13 as a conditional draft; (b) **NOT RUN**, awaiting T085 and F-02 |
+| 1.5 Design system / final UI | Historical prototype-design activity began 2026-11-13 and is preserved as history; **not accepted**; real-staging acceptance **NOT RUN**, carried to T085/M1-done |
+| 1.6 Plans and limits | WhatsApp authentication rate factually verified 2026-11-14 (not an approval); plan numbers **not approved**, row not done; carried to `plans-values`/M1-done |
+| Final Arabic + Latin name | **Not approved.** `final-name` gate (PD-029 A1) remains open; the working name ونيس — Wanees (PD-043) does not satisfy it; carried to M1-UI and every naming-dependent gate |
+
+**Feature checklist run.** The `/speckit-checklist` runs were recorded 2026-11-13/14 (`checklists/entry-gate.md`, `checklists/entry-gate-assessment.md`). The 82 unchecked markers, item-level classifications and named gates are unchanged. The BE-5 owner disposition of 2026-11-15 does not close Partial, unresolved, Deferred or Consistency items.
+
+**Authorizations recorded separately** (none implied by another):
+- Gate 2 content/structure: scoped approval 2026-11-13; revised package approved 2026-11-15.
+- Implementation: T010, T035, T048 (owner, 2026-11-14, prior scope unchanged); T001 and T002 only (owner, 2026-11-16). No other card is authorized.
+- Commit, push and one Phase pull request for this Phase: the owner wrote on 2026-11-16, "I also authorize the necessary scoped commits, branch push, and creation of one Phase PR after successful implementation and independent review. Do not merge the PR."
+
+**Still open after this record** (not closed by it): M1-done evidence (1.3 (b), 1.4 (b), 1.5 acceptance, 1.6 values, final name), `final-name`, `plans-values`, `accessibility` and every per-card gate in the `tasks.md` Gate register, OD-01–OD-18, FP-003, legal task 0.10 and company task 0.11.
+
+**Verification of this record** (Windows host, Node `v22.22.0`, npm `10.9.4`, 2026-11-16):
+- `git diff --no-index` of a pre-edit snapshot against this file: additions only, 0 deletions; no existing scenario or setup text changed.
+- `npm run typecheck`, `npm run docs:check`, `npm run launch:check`, `npm run public-safety:check`: all exit 0.
+- `npm test` on the Windows host: 6–7 failed, 451–452 passed, 25 skipped of 483 across two runs, in files unrelated to documentation (file-mode, local provisioner, CLI, member-migration, CSRF and webhook tests). This is **not** a passing full-suite result and is reported as such. No Linux + PostgreSQL 17 run was made; this record changes no PostgreSQL, authentication, storage or isolation code.
+- The raw outputs are kept in the untracked `.scratch/wanees-phases/phase-1/runs/`.
