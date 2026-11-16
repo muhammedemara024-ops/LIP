@@ -198,7 +198,7 @@ function realCopy(edit = (s) => s, doneEvidence = []) {
   const d = mk({ status: "none", cards: "", doneEvidence });
   for (const rel of REAL) { mkdirSync(dirname(join(d, rel)), { recursive: true }); writeFileSync(join(d, rel), readFileSync(join(ROOT, rel), "utf8")); }
   const tp = join(d, REAL[0]);
-  writeFileSync(tp, edit(stripAuth(readFileSync(tp, "utf8").replace(/\r\n/g, "\n").replace(/^- \[x\] (T00[12]) /gm, "- [ ] $1 "))));
+  writeFileSync(tp, edit(stripAuth(readFileSync(tp, "utf8").replace(/\r\n/g, "\n").replace(/^- \[x\] (T00[12]|T010|T035|T048) /gm, "- [ ] $1 "))));
   return run(d);
 }
 const addAuth = (list) => (s) => s.replace("**Status**: ", `**Status**: **Implementation authorization (owner, 2026-12-01): ${list} only.** `);

@@ -319,3 +319,12 @@ Update `state.json` after every step. On resume, restart at the first step whose
 - Review verdicts.
 - The smallest set of owner decisions needed now.
 - The PR URL, if there is one.
+
+## 10. Completion signal (unattended runs; per-execution marker)
+
+A completion marker belongs to exactly one execution. A stale or generic marker must never be able to trigger shutdown.
+
+1. **Run id.** At the start of an unattended execution, generate `runId = wanees-<UTC yyyymmddThhmmssZ>-<8 random hex>` and record it in `log.md`. Evidence for the run goes under `D:\Wanees-Delegation-Evidence\runs\<runId>\` (report and evidence copies).
+2. **Success marker.** Write `D:\Wanees-Delegation-Evidence\runs\<runId>\COMPLETE-<runId>.flag` only when every one of these is true: at least one task was executed in this run; every task the run set out to do, and every authorized and eligible task found by `phase-status.mjs`, is `done` with evidence in `state.json`; Phase verification, independent review and the delivery steps of §7 (including the green `verify` on the pushed SHA and the verified fast-forward) succeeded; no blocker is recorded. Its content is exactly one line: `PHASE_COMPLETE_SUCCESS runId=<runId> main=<full sha> tasks=<comma-separated task ids>`. Write it atomically (temporary file, then rename) as the last operation, after the report is saved.
+3. **Blocked or incomplete.** Write `BLOCKED-<runId>.md` in the same directory (exact blockers, owner decisions needed, completed task ids and SHAs) and never a success marker. Doing no work because nothing is eligible is a blocked outcome, not a success.
+4. **Never reuse.** Do not write, overwrite, rename into place or leave behind a generic `PHASE-COMPLETE.flag`. A leftover marker from an earlier run is renamed with a `.stale-<timestamp>` suffix (never deleted) before a new run starts. A watchdog must accept only a marker whose `runId` equals the id of the execution it started.
