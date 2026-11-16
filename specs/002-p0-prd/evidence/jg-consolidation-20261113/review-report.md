@@ -1,0 +1,22 @@
+# JG consolidation — review evidence
+
+**Status**: **APPROVED FOR OWNER REVIEW**, independent read-only Sol follow-up completed 2026-11-13. This is documentation readiness only, not policy ratification, Roadmap acceptance or implementation authorization. The exact separate reviewer's verdict is in [review-final.md](review-final.md).
+
+The configured plan-review lane ran in a separate Codex CLI process with `--sandbox read-only`, `--model gpt-6.1-sol`, high reasoning and no tools/commands/file changes. It reviewed supplied current source snapshots with original line numbers. Parent-side SHA256 verification confirms all 16 source files still match the [follow-up snapshot manifest](followup1-manifest.json). The reviewer did not recompute hashes; the parent performed that mechanical check. Both review processes completed with native exit0 and `turn.completed`; this is not a self-review or a Fable verdict.
+
+Initial verdict: CHANGES REQUIRED. Findings: CRITICAL0, HIGH0, MEDIUM1, LOW2. All three were corrected and independently verified in one follow-up round; remaining severity findings: **0**.
+
+- MEDIUM: new consolidation text incorrectly said Gate2 was wholly pending/unrecorded. Corrected to preserve the 2026-11-13 scoped approval in plan.md/tasks.md (six content-only cards, T059–T078 gate records, other cards blocked structure), without additional approval or implementation permission.
+- LOW: OD-06 was called operator authorization. Corrected to PD-010/FR-013/R-13 authentication/allowlist authority, with OD-06 separately the provider/transport fallback dependency.
+- LOW: positive whole points costs/max5 rewards were attributed to PD-020. Corrected to PD-024; PD-020 retains its actual expiry/operational values.
+- Reviewer observation: F-11 now expressly addresses per-step versus whole-transaction two taps and mandatory amount-entry digit taps. No count or measurement was invented.
+
+No unresolved material technical disagreement remains after the one follow-up. Under the current disagreement-based policy, Fable adjudication is not triggered. A Fable publication review remains mandatory before any future authorized push; none is requested here. Reviewers do not decide remaining owner policy questions.
+
+Current JG status: **0 closed; 9 partial (JG-01/02/03/04/06/07/10/11/12); 3 policy-ready awaiting owner approval (JG-05/08/09).** PD-040 C2 also contains the separable no-silent-owner-replacement boundary; JG-07 remains partial because reissue/conflict procedure details are unresolved. All new choices remain Proposed. Full conflicts, missing ranges, blocked security follow-ups and the synthetic Android profile are in the [consolidation assessment](../../specs/002-p0-prd/journeys/jg-consolidation-review.md).
+
+Validation on Windows, Node22.22.0: docs:check PASS (10 mirror pairs); public-safety:check PASS (703 tracked files); typecheck PASS (workspace and Admin); launch:check PASS. [Command output/exit evidence](repository-checks.json). Additional [document checks](validation.json): **18 passed, 0 failed, 0 skipped**, including42 local links/anchors, all seven changed/new documents scanned for the repository's secret patterns, four retained Mermaid flowcharts, all previous decision text preserved byte-for-byte, reviewed hashes unchanged, unrelated baseline files and staged .gitattributes unchanged. git diff --check passed; only existing LF→CRLF notices were emitted.
+
+No Vitest/runtime/PostgreSQL tests, rendered Mermaid validation, prototype timing/tap test, real device test, legal clearance or live messaging delivery was executed; these are documentation-only changes. No application source, schema, migration, approved requirement, OD record, model routing, governance or Git setting changed. No staging, commit or push occurred.
+
+Roadmap1.2–1.4 may be presented for **decision-dependent owner review**, not unconditional acceptance: recovery and historical-value protection need approved mechanisms/amendments; JG-10 needs explicit customer-operation stage cells; OTP counting/timer/tap metrics require clarification; wizard ranges and notification scope need decisions. First-stamp, walkthrough and physical-device results remain NOT RUN. OD-01–OD-18 remain unresolved and FP-003 unauthorized. Historical scoped approvals stand; remaining content approvals, roadmap/Phase1 entry gates, final name/prototype1.5/plans1.6/checklist/T001 and separate named implementation authorization still apply.

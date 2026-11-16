@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-12
 
-**Status**: Approved at Gate 1 (project owner, 2026-11-12) — PRD v1.0 only. Clarified 2026-11-12; Gate 1 audit changes applied 2026-11-12 (decisions PD-030 to PD-037); Gate 1 interpretations PD-038 P1–P10 approved by the owner 2026-11-12 (P3, P6, P7 and P8 with revisions). Final independent review: Fable 5.1 APPROVED WITH CONDITIONS; its documentation conditions were closed and its closure check returned APPROVED (2026-11-12). Gate 1 approval is limited to this PRD and its approved product requirements; it does **not** approve FP-003 implementation and its unresolved point-lot attribution algorithm; application code changes; running `/speckit-plan` or `/speckit-tasks`; committing or pushing; pilot readiness. SC-017 and the FP-003 implementation blockers (Dependencies) remain mandatory before any points-program pilot
+**Status**: Approved at Gate 1 (project owner, 2026-11-12) — PRD v1.0 only. Amended in place 2026-11-13 with owner approval (PD-029 A1, PD-044): the final-name timing in §Dependencies; new FR-134 and SC-018 (WCAG 2.2 AA). Amended in place 2026-11-13 with owner approval (PD-042): US9, FR-092 and SC-008 now cite the PD-005 A2–A4 stage tables, and the suspended pending-claim edge case records PD-005 A4. Clarified 2026-11-12; Gate 1 audit changes applied 2026-11-12 (decisions PD-030 to PD-037); Gate 1 interpretations PD-038 P1–P10 approved by the owner 2026-11-12 (P3, P6, P7 and P8 with revisions). Final independent review: Fable 5.1 APPROVED WITH CONDITIONS; its documentation conditions were closed and its closure check returned APPROVED (2026-11-12). Gate 1 approval is limited to this PRD and its approved product requirements; it does **not** approve FP-003 implementation and its unresolved point-lot attribution algorithm; application code changes; running `/speckit-plan` or `/speckit-tasks`; committing or pushing; pilot readiness. SC-017 and the FP-003 implementation blockers (Dependencies) remain mandatory before any points-program pilot Amended in place 2026-11-13 with owner approval (PD-046, merchant branding): FR-135–FR-139, SC-019, US1 scenario 8, US4 scenarios 9–10, a roles row, the Brand palette entity, edge cases, out-of-scope rows, open items MB-01–MB-04 and a traceability row. PD-046 item 10 (any business category; FR-135 sentence and the logo row), owner-requested 2026-11-13; MB-01–MB-05, PD-001 A1 and PD-005 A5 owner-approved 2026-11-14 (decisions only; not Gate 2); US9, FR-092 and SC-008 now cite the PD-005 A2–A5 tables. PD-046 U-1–U-6 and corrections A–C owner-approved 2026-11-14 (FR-136, FR-138 and four branding edge cases updated; SC-019 unchanged; decisions only, not Gate 2). Pending independent review.
 
 **Input**: User description: "Create the P0 PRD v1.0 specification for our multi-tenant café loyalty SaaS. Use the approved PD-001 through PD-029 decisions, business rules, product brief, gap analysis, architecture map, and Phase 1 Task 1.1 acceptance criteria as authoritative sources."
 
@@ -35,6 +35,14 @@
 - Gate 1 decisions (owner, 2026-11-12), recorded in `01-decisions.md`: D1 → points voids reverse the original accrual through fork patch FP-003, design only (PD-037); D2 → customer-absent amount corrections deferred to P1, and owner `service_recovery` is not an equivalent accounting correction (PD-030); D3 → plan limits monitored without enforcing customer, branch or message caps (PD-035); D4 → each visit attributed to the branch of its day's first qualifying purchase, recomputed after voids (PD-032); D5 → conservative SLO: 99.5% per operation, at least 99.5% monitoring coverage, no PASS unless met with missing minutes counted as unavailable (PD-033); D6 → owner clarification answers recorded as Approved with provenance (PD-030 to PD-036), agent-derived interpretations recorded as Proposed (PD-038).
 - PD-038 owner decisions (2026-11-12): P1, P4, P9 and P10 approved as written; P2 approved including the minimum-eligible-spend rule; P5 approved with acquisition-branch cohorts labelled separately from branch activity; P3 (test café isolation), P6 (a definite failure stays FAIL whatever the coverage), P7 (no double debit of already-expired points; formula validated by regression tests before implementation approval) and P8 (ledger recovery, verified zero-accrual versus uncertain states) approved with revisions.
 
+
+### Session 2026-11-13 (Gate 2 owner decisions)
+
+- Q: Which owner actions not listed in PD-005 A2 are allowed in each subscription stage? → A: PD-005 A3 (owner-approved 2026-11-13); it adds 13 actions without changing A2's ten rows, including an unpublished-draft exception to FR-048 in read-only.
+- Q: Where is the server-side amount parser, and which amount forms are valid? → A: PD-039 (owner-approved 2026-11-13): authoritative parser in the BFF; strict input grammar; no thousands grouping in display.
+- Q: Does each merchant get its own brand colours in P0? → A: Yes. PD-046 (owner-approved 2026-11-13): three colours per merchant, a platform default, merchant-context theming with AA-derived colours. MB-01–MB-05 owner-approved 2026-11-14 (PD-046).
+- Q: Is the platform only for cafés and restaurants? → A: No. PD-001 A1 (owner-approved 2026-11-14): the architecture is category-agnostic, and the initial pilot stays with cafés and restaurants. Where this PRD says "café", it describes the pilot merchant. Architecture, data model and contracts must not assume a business category. Extending a café-specific operational rule to other categories needs its own decision.
+
 ## Roles and permissions matrix (P0)
 
 Roles (PD-014): **Super Admin** (platform operator), **Owner** (one per café), **Cashier** (staff on a registered branch device), **Customer**. Branch Manager is P1. Every permission is enforced by the server; the café and branch always come from the signed-in session or registered device, never from what a client sends (PD-014).
@@ -59,6 +67,7 @@ Roles (PD-014): **Super Admin** (platform operator), **Owner** (one per café), 
 | Export customers | — | ✗ (P0) | ✗ | — |
 | View fraud alerts and mark reviewed (PD-027) | — | ✓ | — | — |
 | See plan, period end and subscription stage (PD-017, PD-018) | ✓ | ✓ | — | — |
+| Choose, preview and change the merchant's three brand colours (PD-046 MB-03; every stage, PD-005 A5) | — | ✓ | — | — |
 | Join a café, show member QR, show reward QR, revoke own devices, delete account | — | — | — | ✓ |
 | Accept or decline a pending paper-card migration (PD-022) | — | — | — | ✓ |
 
@@ -81,6 +90,7 @@ A café customer scans the printed Branch QR of the branch they are in, signs in
 5. **Given** a non-Egyptian or malformed mobile number, **When** it is submitted, **Then** it is rejected before any code is sent.
 6. **Given** a café in the suspended stage, **When** a new customer tries to join it, **Then** joining is refused with a clear message, while existing members keep their cards (PD-005 A2).
 7. **Given** too many code requests or wrong codes, **When** limits are exceeded, **Then** sending or verifying is refused per the approved limits (PD-004, PD-020).
+8. **Given** a customer with cards at two merchants with different brand palettes, **When** they move from merchant A's card to merchant B's card, **Then** only merchant B's palette is shown, and no merchant A colour remains on screen, in a cached view or offline (PD-046, FR-138).
 
 ---
 
@@ -146,7 +156,9 @@ The Super Admin provisions the café and sends a single-use invite bound to the 
 5. **Given** reward names, **When** entered, **Then** a name in the café's main language is required and the second language is optional (PD-007).
 6. **Given** a publish attempt, **When** the owner confirms, **Then** a fresh one-time code is required and the publish is audited (PD-010).
 7. **Given** a published program, **When** the owner tries to change the program type or the stamp threshold, **Then** it is refused (PD-012, PD-025).
-8. **Given** a café in the read-only or suspended stage, **When** the owner tries to publish or change the program, **Then** it is refused (PD-005 A2).
+8. **Given** a café in the read-only or suspended stage, **When** the owner tries to publish or change the program, **Then** it is refused (PD-005 A2). *(Clarified 2026-11-13 by PD-005 A3: editing an unpublished program draft is allowed in read-only and refused in suspended; publishing stays refused in both.)*
+9. **Given** onboarding, **When** the owner reaches the brand-colour step, **Then** the three colours are prefilled with the platform default, a preview shows a sample card in Arabic and English using the accessible derived colours, and keeping the default takes one action (PD-046, FR-136, FR-139).
+10. **Given** a colour value that is not exactly `#RRGGBB`, **When** the owner saves it, **Then** it is refused and nothing changes; no field accepts CSS, a script, a URL or an image (FR-137).
 
 ---
 
@@ -244,17 +256,17 @@ The owner dashboard has 8 pages — Overview, Customers, Programs, Transactions,
 
 ### User Story 9 — Super Admin records payments and the subscription stage follows the period end (Story priority 2)
 
-Payment is collected offline; the Super Admin records each payment and sets or extends the plan and period end. After the end date the café automatically moves through grace (days 1–7), read-only (days 8–37) and suspended (day 38 onward) in Cairo calendar days, with the approved permission table; recording a payment restores full service immediately (PD-005 A1, PD-005 A2, PD-017, PD-020).
+Payment is collected offline; the Super Admin records each payment and sets or extends the plan and period end. After the end date the café automatically moves through grace (days 1–7), read-only (days 8–37) and suspended (day 38 onward) in Cairo calendar days, with the approved permission table; recording a payment restores full service immediately (PD-005 A1, PD-005 A2–A4, PD-017, PD-020).
 
 **Why this priority**: The business model depends on it; it is P0 by PD-017.
 
-**Independent Test**: Advance a café past its period end and check each stage's allowed and refused actions against the PD-005 A2 table; record a payment and confirm immediate restoration.
+**Independent Test**: Advance a café past its period end and check each stage's allowed and refused actions against the PD-005 A2–A5 tables; record a payment and confirm immediate restoration.
 
 **Acceptance Scenarios**:
 
 1. **Given** a payment record, **When** submitted twice by accident, **Then** it is recorded once; payment records are never edited or deleted, only reversed by a new entry (BR).
 2. **Given** any change to plan or period end, **When** saved, **Then** it is audited with actor, before/after and time.
-3. **Given** each stage, **When** each action in the PD-005 A2 table is attempted, **Then** it is allowed or refused exactly as the table says, including redemptions, voids, corrections, revocations and branch QR rotation remaining allowed when suspended.
+3. **Given** each stage, **When** each action in the PD-005 A2–A5 tables is attempted, **Then** it is allowed or refused exactly as the tables say, including redemptions, voids, corrections, revocations and branch QR rotation remaining allowed when suspended.
 4. **Given** a lapsed café, **When** a payment extends the period, **Then** full service returns immediately.
 5. **Given** the stage engine, **When** a café is read-only or suspended, **Then** customers' balances are never removed.
 
@@ -360,7 +372,7 @@ Customers and owners reach a platform WhatsApp support number (phone fallback). 
 - A void is requested while a migration for the same member is pending: the void's member block refuses the migration posting until the void is reconciled.
 - An owner deactivates a branch while a reward hold is open there: the hold is released; the reward or points stay available at other branches.
 - A café crosses from grace to read-only during an owner's program edit: the publish is refused at the moment of submission.
-- A café is suspended while a pending claim is open: the claim cannot be confirmed; it expires.
+- A café is suspended while a pending claim is open: the claim cannot be confirmed; it expires. While the café is suspended, a customer cannot create a new pending claim (PD-005 A4).
 - The program is republished between a stamp purchase and its void: the void goes to the owner instead of running automatically.
 - A customer deletes their account while a pending migration exists: the pending migration is cancelled (it was never posted).
 - A customer's phone changes owner (recycled number): handled by the account recovery procedures of task 1.2.
@@ -377,6 +389,14 @@ Customers and owners reach a platform WhatsApp support number (phone fallback). 
 - A customer buys at branch A at 09:00 and branch B at 11:00 on the same Cairo day: one visit, attributed to branch A; if the 09:00 purchase is voided, the visit is attributed to branch B (FR-162).
 - Egypt's daylight-saving change shortens or lengthens that day's SLO window (for example 1,020 or 1,140 minutes instead of 1,080): availability uses the actual elapsed minutes (SC-012).
 - The first week of the pilot has no customer with a 30-day history: the repeat rate reads NOT YET MEASURABLE, never 0% (PD-028).
+- A merchant never sets brand colours: its merchant-context screens use the platform default palette (FR-135).
+- An owner picks a light primary colour that is too pale for text: text and icons use the derived variants, and the preview shows them before saving (FR-139).
+- The owner changes the palette while a customer has the card open: the next refresh shows the new palette, and no colour from another merchant is ever shown in between (FR-138).
+- A merchant is read-only or suspended: its members still see its palette on their cards. The owner may still change the palette in those stages (PD-005 A5).
+- The owner exceeds a change limit (the 11th saved change for the merchant, or the 31st attempt by the owner account, within a rolling 60 minutes): the request is refused with the time to retry, and nothing changes (FR-136; PD-046 U-2, U-6).
+- The owner's session expired or was revoked before saving: saving asks the owner to sign in again, and nothing changes until they do (FR-136; PD-046 U-1).
+- A customer reloads a purchase claim or a pending paper-card migration: the screen keeps that merchant's palette when the server can re-establish the context; otherwise it shows the platform appearance, never another merchant's palette (FR-138; PD-046 corrections A and C, U-4).
+- A customer opens an invalid, unknown, inactive or rotated Branch QR: the screen shows the platform appearance, never a previously shown merchant's palette (FR-138; PD-046 U-5).
 
 ## Requirements *(mandatory)*
 
@@ -433,7 +453,7 @@ Customers and owners reach a platform WhatsApp support number (phone fallback). 
 - **FR-045**: Reward expiry MUST default to 30 days after issue, configurable 7–90 days (PD-020).
 - **FR-046**: Issued rewards and open holds MUST keep an immutable snapshot of their terms; program changes apply only to future events (PD-024, PD-025).
 - **FR-047**: Reward names and descriptions MUST be editable without republishing the loyalty program (PD-025).
-- **FR-048**: Program and reward changes MUST be owner-only, audited, and refused in the read-only and suspended stages (PD-025, PD-005 A2).
+- **FR-048**: Program and reward changes MUST be owner-only, audited, and refused in the read-only and suspended stages (PD-025, PD-005 A2). *(Clarified 2026-11-13 by PD-005 A3: editing an unpublished program draft is not a program change and is allowed in read-only, refused in suspended; publishing and reward-expiry changes stay refused in both.)*
 - **FR-049**: The program wizard MUST NOT offer product/category exclusions, discount rewards, multiple programs or tiers (PD-008, PD-012, PD-015).
 
 **Redemption**
@@ -481,7 +501,7 @@ Customers and owners reach a platform WhatsApp support number (phone fallback). 
 
 - **FR-090**: The Super Admin MUST record offline payments with café, amount in integer piasters, method, reference, payment date and recorded-by; a double submit records once; records are append-only with reversing entries (PD-005 A1, BR).
 - **FR-091**: The Super Admin MUST be able to set or extend the plan and period end; every change is audited (PD-017, BR).
-- **FR-092**: The subscription stage MUST follow the period end date automatically (grace days 1–7, read-only 8–37, suspended 38+, Cairo calendar days) and enforce the PD-005 A2 permission table exactly (PD-005 A2, PD-020).
+- **FR-092**: The subscription stage MUST follow the period end date automatically (grace days 1–7, read-only 8–37, suspended 38+, Cairo calendar days) and enforce the PD-005 A2, A3, A4 and A5 permission tables exactly (PD-005 A2–A5, PD-020).
 - **FR-093**: Recording a payment that extends the period MUST restore full service immediately; balances are never removed by any stage (PD-005 A2).
 - **FR-094**: The owner MUST see plan, period end and current stage on Overview and Settings (PD-017, PD-018).
 - **FR-095**: Plan limits (customers, branches, messages) MUST be defined per plan (task 1.6) and monitored in P0; each café's usage against its plan's limits is visible to the Super Admin through P0 operator tools (PD-038 P9). P0 MUST NOT enforce subscription capacity limits: no join, branch creation, staff creation or message is refused because a plan limit is reached; enforcement is P1 task 6.3. The platform MUST keep authoritative, uncapped customer and branch counts for monitoring. Loyalty-platform usage recording, if used at all, MUST stay outside the join, award and redeem success paths, and its failure or refusal MUST never block them. Security limits (sign-in, code and rate limits, the sending circuit breaker), billing-stage restrictions (PD-005 A2), tenant isolation and accounting safeguards remain fully enforced (PD-035).
@@ -512,6 +532,20 @@ Customers and owners reach a platform WhatsApp support number (phone fallback). 
 - **FR-131**: Each café's main content language MUST be required for program, reward and branch names; the other language is optional and falls back to the main one (PD-007).
 - **FR-132**: Money MUST be stored as integer piasters and displayed per PD-007 (zero piasters hidden); digits are shown as Western digits and Arabic-Indic/Persian input is normalized (PD-007, constitution Article V).
 - **FR-133**: All day-based rules and displayed times MUST use `Africa/Cairo` (PD-007).
+- **FR-134**: Every customer, cashier and owner surface MUST conform to WCAG 2.2 Level AA (PD-044). The approved PIN and OTP requirements are unchanged (FR-010, FR-014, PD-004, PD-010). One-time-code fields allow paste and browser autofill. How the staff PIN step meets SC 3.3.8 is an open owner decision (PD-044, A11Y-01).
+
+**Merchant branding (PD-046)**
+
+- **FR-135**: Each merchant MUST have at most one brand palette of exactly three colours (primary, secondary, accent), stored per merchant and never globally. Every branch MUST use its merchant's palette; branch-level palettes are out of scope for P0 (MB-04). A merchant with no palette MUST use the platform default: primary `#3A2419`, secondary `#E8C88A`, accent `#F59E0B` (PD-046). Branding applies to every merchant whatever its business category and MUST make no category-specific assumption (PD-046 item 10).
+- **FR-136**: The merchant's owner MUST be able to choose, preview and save the palette as a step in onboarding, prefilled with the default, where keeping the default takes one action. The owner MUST also be able to preview, change or reset it later in Settings, with no new dashboard page (FR-100). The merchant comes from the signed-in session, never from the client (PD-014). Every change and reset is audited (FR-150). A change is allowed in every subscription stage (PD-005 A5). An ordinary change in a valid, trusted owner session needs no fresh one-time code. The request is CSRF-protected. When the owner session is expired, invalid or revoked, the owner MUST sign in again; P0 adds no other verification (MB-03, U-1). Per rolling 60 minutes, at most 10 successful saved changes per merchant (resets and the onboarding save count; previews do not) and 30 mutation attempts per owner account are allowed; beyond either limit the request MUST be refused with a retry indication (U-2, U-6).
+- **FR-137**: A colour value MUST be exactly `#RRGGBB` (six hexadecimal digits, stored in upper case). Any other value is refused and nothing changes. Branding MUST NOT accept CSS, scripts, URLs, fonts or images. Colours reach a browser only as server-validated values applied to fixed design tokens.
+- **FR-138**: Customer screens shown in a merchant context MUST use that merchant's palette, including the member card, progress, rewards and member code. Screens without a merchant context MUST keep the neutral platform appearance. Which screens are platform or merchant context follows MB-02: the customer card list keeps the platform appearance, each merchant tile shows that merchant's colours, and the account stays unified. Counter, owner dashboard and administrative interfaces keep the platform theme (MB-01). The client MAY identify a merchant context (a membership, claim, pending migration, merchant link or scanned Branch QR). The server MUST validate that identifier for the signed-in customer or the Branch QR credential and resolve the merchant and palette itself. A client-supplied palette, tenant or authorization claim, or unverified merchant context MUST never be trusted. When no valid, authorized merchant context can be established, the platform appearance is shown, never a previously shown merchant's palette (PD-046 corrections A and C). Moving between a customer's merchants MUST show only the selected merchant's palette, with no colour from another merchant displayed, cached or reused (FR-001, PD-014). The shared customer account and the platform architecture are unchanged (PD-001, PD-006).
+- **FR-139**: Merchant colours MUST NOT reduce WCAG 2.2 AA conformance (FR-134, PD-044):
+  - Text and icons on a brand colour use a derived foreground of at least 4.5 : 1.
+  - A brand colour used as text, an icon or a required graphic on a light surface uses a derived variant of at least 4.5 : 1 for text and 3 : 1 for non-text, against adjacent colours.
+  - Status colours (error, success, warning), focus indicators and QR codes keep platform colours and are never themed.
+  - Colour is never the only signal.
+  - The 70 / 25 / 5 proportions are visual guidance, not a measured rule.
 
 **Messaging and support**
 
@@ -550,6 +584,7 @@ Customers and owners reach a platform WhatsApp support number (phone fallback). 
 
 - **Customer account**: one person on the platform, identified by verified phone; holds first name, language choice, devices (max 3), sessions. Personal data lives only here.
 - **Café (tenant)**: an independent business with one owner, branches, staff, one program, subscription and payment records.
+- **Brand palette**: per merchant; primary, secondary and accent as `#RRGGBB`, a version, and who changed it and when. Absent means the platform default (FR-135). Not personal data.
 - **Membership / card**: a customer's card at one café; balance, issued rewards, visit history; never transferable.
 - **Branch**: a café location with status (active/inactive), weekly opening hours, one rotatable Branch QR (used for joining and pending claims), registered devices; joins are attributed to the branch whose QR was scanned.
 - **Staff member**: a cashier with verified phone, PIN, branch, and a device registration; one staff profile per café is the owner staff profile — exactly one per café (PD-038 P1) — linked to the owner account (FR-016).
@@ -577,7 +612,7 @@ Customers and owners reach a platform WhatsApp support number (phone fallback). 
 - **SC-005**: During peak hour across 100 cafés at once, 95% of awards complete within half a second and no purchase is ever awarded twice (roadmap 5.2).
 - **SC-006**: Zero data-integrity incidents during the 4-week pilot: no double award, double redemption, lost balance, stamp card left outside [0, threshold) after a completed stamp void, or points void reversing an amount other than FR-068 requires (the purchase's original net accrual, excluding its own points that already expired, under the lot-attribution rule the owner approves before FP-003 implementation) (PD-028, PD-008 A1, PD-037, PD-038 P7). Points balances may go negative (PD-020).
 - **SC-007**: Zero successful cross-café or cross-branch access in the isolation and permission test suite (PD-014).
-- **SC-008**: Every stage-by-action combination in the PD-005 A2 table behaves exactly as specified in acceptance testing (100% of cells).
+- **SC-008**: Every stage-by-action combination in the PD-005 A2–A5 tables behaves exactly as specified in acceptance testing (100% of cells).
 - **SC-009**: A non-technical person completes owner onboarding, and a customer completes join → earn → redeem, without help (roadmap M4).
 - **SC-010**: Pilot outcome targets (not automatic rejection gates): at least 150 enrolled customers across pilot cafés by week 4; at least a 25% 30-day repeat rate assessed at week 8 over at least 100 eligible customers, reported as NOT YET MEASURABLE (week 4, no eligible cohort) or INCONCLUSIVE (fewer than 100 eligible customers) when applicable (PD-028, FR-161).
 - **SC-011**: Owner interviews at weeks 2 and 4 record perceived value, cashier friction, customer feedback and willingness to continue (PD-028).
@@ -597,6 +632,11 @@ Customers and owners reach a platform WhatsApp support number (phone fallback). 
 - **SC-015**: Before the pilot: a fresh production dependency audit, an OS-package container-image vulnerability scan and live multi-tenant cloud runtime readiness checks are completed, and every critical and high production vulnerability is resolved or accepted in writing by the owner (roadmap 0.12 and 5.6).
 - **SC-016**: Every scheduler and the webhook dispatcher are safe with several running instances: with two instances running, a due job runs exactly once (roadmap 2.7).
 - **SC-017**: Points voids reverse exactly the amount FR-068 requires (the original net accrual, excluding the purchase's own points that already expired) in the official verification environment, including after an earn-rate change and after partial or full expiry (FR-068, PD-037, PD-038 P7), before any points café joins the pilot.
+- **SC-018**: An evaluation of every implemented P0 customer, cashier and owner screen against WCAG 2.2 Level AA finds no unresolved Level A or AA failure (PD-044).
+- **SC-019**: In acceptance testing with two merchants with different palettes, plus one merchant on the default (PD-046):
+  - moving between them shows only the selected merchant's palette on 100 % of tested themed screens, including cached and offline views;
+  - every derived colour pair meets the FR-139 ratios, for those palettes and for a fixed set of hard-case colours;
+  - 100 % of invalid colour inputs are refused.
 
 ## Assumptions
 
@@ -632,6 +672,10 @@ Customers and owners reach a platform WhatsApp support number (phone fallback). 
 | Cashier lookup by phone number | Backlog | PD-003 |
 | Offline earning queue | Backlog | roadmap backlog |
 | Support ticketing system | P1 | PD-019 |
+| Merchant CSS, scripts or free-form styling | Never (FR-137) | PD-046 |
+| Merchant logos, images or fonts | Not in P0 (MB-05): the merchant name is shown as text; no upload, image storage or image processing. A logo is a future-phase decision | PD-046 |
+| Branch-level brand palettes | Not in P0 (MB-04) | PD-046 |
+| Separate apps, domains or customer accounts per merchant | Not in P0 (shared platform) | PD-046, PD-001 |
 | Mobile app, push, geofencing, advanced analytics | P2 | brief |
 | Causal retention-lift claims | Task 6.6 | PD-028 |
 
@@ -639,9 +683,12 @@ Customers and owners reach a platform WhatsApp support number (phone fallback). 
 
 - **Legal (task 0.10)**: owner view of last 3 phone digits and owner search (PD-013); data collected at join and consent texts (PD-023, task 5.4); support chats held abroad and recovery identity checks (PD-019); data residency (PD-006). If the opinion disagrees, the affected decisions reopen.
 - **Company registration (task 0.11)**: live one-time codes and owner invites to real numbers, WhatsApp/SMS senders, support number, pilot.
-- **Final product name (PD-029)**: required before task 1.5 prototype.
+- **Final product name (PD-029, A1; PD-047, 2026-11-15)**: required before M1-UI/final UI acceptance and any explicit name-dependent work; the working name remains non-final. The pre-implementation Figma prototype is not required by the selected U-b route. Final UX acceptance is on the implemented real-staging application through T085; all original criteria remain.
 - **Plans and limits (task 1.6)**: plan names, prices in EGP and limits; P0 monitors them, enforcement is P1 task 6.3 (FR-095).
 - **Super Admin identity provider (task 2.2)**.
+- **Merchant branding (PD-046)**: MB-01–MB-05 and PD-005 A5 are owner-approved (2026-11-14). U-1–U-6 and corrections A–C owner-approved (2026-11-14). The implementation design is in the Gate 2 package (`gate2-branding-revision.md`; not approved).
+
+  The planning artifacts (`plan.md`, `data-model.md`, `contracts/`) do not cover branding yet; they need Gate 2 approval before any branding task is ready.
 - **[VERIFY] Technical verification still required**: fork patch FP-003 implemented only after separate owner authorization and its tests passing (FR-068, PD-037, task 3.6); that a refused or failing loyalty-platform usage event never blocks join, award or redeem (FR-095, PD-035, task 5.5); PD-008 A1 checks (a)–(f) in the project's official verification environment; whether the loyalty engine fixes a hold's cost at hold time (PD-025, task 3.4); whether the engine refuses an inactive location (PD-026; the server-side block is required regardless); synthetic zero-value redemption-only orders (task 3.4); the subscription-stage mapping at runtime (task 5.5); FP-003 verification requirements V1–V7 (`07-fork-patches.md`), of which V1 — executable regression tests of the owner-approved point-lot attribution algorithm — is one of the FP-003 implementation blockers listed under *Before FP-003 implementation approval*.
 - **Decision log**: the clarification answers and Gate 1 decisions are recorded as Approved in `01-decisions.md` (PD-030 to PD-037, with provenance). Agent-derived interpretations PD-038 P1–P10 were approved by the owner on 2026-11-12 (P3, P6, P7 and P8 with revisions) and are cited here as "(PD-038 Pn)".
 - **Before FP-003 implementation approval** (blockers, all open): the owner approves a point-lot attribution algorithm, which is unresolved (two source-derived cases show the candidate formula can over-debit when another void or a redemption consumes the purchase's lot before expiry, so it is not proven safe and not implementation-ready); that algorithm passes source-level verification and the executable regression tests of FP-003 V1; FP-003 V2–V4 and V7 are verified (V4 decides whether missing accrual results can ever be recovered, otherwise they stay fail-closed); implementation itself still needs separate owner authorization (PD-037). SC-017 remains mandatory before any points café joins the pilot.
@@ -658,6 +705,7 @@ Customers and owners reach a platform WhatsApp support number (phone fallback). 
 | 2.6 Staff PIN + devices | FR-014, FR-016, FR-085, FR-086; US7 |
 | 2.7 RLS tables, multi-instance safety | FR-001; SC-007, SC-016 |
 | 2.8 i18n + RTL | FR-130–FR-133 |
+| Accessibility, every UI task (PD-044) | FR-134; SC-018 |
 | 2.9 Audit coverage | FR-150–FR-152 |
 | 3.1 Rotating member QR | FR-021, FR-022, FR-121 |
 | 3.2 Bill-amount order builder | FR-023, FR-026 |
@@ -680,3 +728,4 @@ Customers and owners reach a platform WhatsApp support number (phone fallback). 
 | 5.4 Privacy policy, terms, consent | FR-005; dependency 0.10 |
 | 5.5 Manual billing core | FR-090–FR-095; US9; SC-008 |
 | 5.6 Pilot | FR-155–FR-163; SC-009–SC-013, SC-015, SC-017 |
+| Merchant branding (PD-046; proposed roadmap row 4.8) | FR-135–FR-139; US1.8, US4.9–US4.10; SC-019 |

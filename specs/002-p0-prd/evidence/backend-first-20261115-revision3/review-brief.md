@@ -1,0 +1,21 @@
+You are ALREADY the separate plan-review reviewer launched by the primary orchestrator through the configured fleet. Review the files directly and return findings in your final message. Do not launch another delegate or invoke skill procedures that spawn reviewers; the independent-session requirement is already satisfied. No file writes or escalation are needed inside your review session.
+
+# Independent plan-review brief: PD-047 Revision 3
+
+Status: REVIEW REQUEST PREPARED; no verdict or owner approval. Draft-only authorization, 2026-11-15. Risk HIGH.
+
+Use only configured plan-review: codex / gpt-6.1-sol / high / enforced read-only. No other lane, model or subagent fallback. Read AGENTS.md, constitution and all .agents/rules; G01 is applied and its five-file comparison passed, but its separate independent review remains OPEN. Do not restart G01 or repeat fleet tests.
+
+Review the current specs/002-p0-prd/backend-first-amendment.md against the exact pre-edit Revision 2 snapshot .scratch/backend-first-20261115-revision3/revision2-baseline.md (SHA-256 9c9c1c529c0a1f05fda5ba9acfc702200ad6f26522acb8bf698714b6a8cd32bb), the owner's instructions below, and the current approved sources. The baseline is a working-tree snapshot, not HEAD: this proposal was already untracked. No commit boundary is fabricated.
+
+Owner instructions: U-b selected: backend-first development followed by final UI/UX implementation and UX validation on the real staging application, with no pre-implementation Figma prototype. Draft Revision 3 only; preserve thresholds, accessibility, D1-D4, all historical approvals and open gates; no PD-047 approval, Gate 2 opening, implementation, staging, commit, push or deployment.
+
+Review both axes and report them separately:
+- Standards: governance/decision states and approval scopes; rule 01 section 5 impact, compatibility, no schema/data/runtime change, operations/failure recovery; rule 05 new cards remain blocked until complete content/test seams and field 13 are approved; G01 plan-review/final-verdict roles and Hydrogen isolation blocks. Preserve branding exclusions and existing named T010/T035/T048 authorization; do not invent approval for T001/T002. No prospective Fable routing or author self-review.
+- Spec: U-b recorded as selected but PD-047 Proposed. Verify M1-B -> T001, T002 -> T084 -> ui-entry, backend-ready gating actual W6 implementation, no measurement prerequisite for T084 or UI entry, final T085 with T082 OWN-08/live T057/T053, M4 -> T055, pilot behind M1-done/T055/T085 and remaining M-01-M5 choice. Check exact prerequisite/gate manifest against prose AND current task/register data. Validate thresholds, seven raw timing events, <15-minute SC-001 / <3-minute SC-002 / <=2 taps, 360/320px, 200% text, AR/EN, WCAG 2.2 AA, OTP paste/autofill and A11Y-01. Check no dropped receiving screens, tests or FR/SC traceability.
+
+Read current docs/context/01-decisions.md PD-029/039/041-046; 04-business-rules.md; 06-roadmap.md; 07-fork-patches.md; feature plan/tasks/spec, journeys, prototype D1-D4 and open-decisions-M01-A11Y01.md; .scratch/backend-first-20261114/sol-review-run2.md and historical graph files. Do not re-run broad application checks or fleet tests. The graph_v3.py validator is read-only; it may be run with python -B -I but its author-written assertions are not independent proof. Inspect for omitted gates or acceptance cycles yourself.
+
+Make NO file changes, including this brief/report; no staging or git writes; no installs, live messages, deployment, security changes or permission escalation. If read-only enforcement or provider/auth transport is unavailable, STOP and report BLOCKED, with no verdict. Review output goes only to the relay's external output directory, not repository edits.
+
+Return separate Standards and Spec findings with severity and exact file/line evidence, actual verification performed, unresolved owner decisions, and a verdict for REVIEW ONLY. Agreement must have evidence; no product or implementation authorization. At most two follow-up rounds for substantive disagreement; failed launches do not count as completed reviews. final-verdict only if an unresolved material disagreement survives both rounds, or before an authorized push. No publication is requested.
