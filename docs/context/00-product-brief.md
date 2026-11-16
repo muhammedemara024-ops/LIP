@@ -17,7 +17,7 @@ marketing. Launch market: Egypt. Later: wider MENA / international.
 
 | Topic | Decision |
 | --- | --- |
-| Target market | Many independent cafés & restaurants (not one café) |
+| Target market | Platform: category-agnostic, any type of merchant (PD-001 A1, 2026-11-14). Initial pilot: many independent cafés & restaurants (not one café) |
 | Customer experience | Web app first, mobile app later (P2) |
 | Loyalty types | Flexible: stamps and points (tiers later) |
 | Transaction capture | Customer scans branch QR **and** staff scans customer QR |

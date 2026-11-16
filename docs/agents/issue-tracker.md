@@ -10,7 +10,7 @@ By default, specifications and implementation tickets live as local Markdown fil
 - **Feature specification (`to-spec`)**: `.scratch/<feature-slug>/spec.md`
 - **Implementation tickets (`to-tickets`)**: One file per vertical-slice ticket at `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01` in dependency order (blockers first), never a single combined tickets file.
 - **Blocking edges**: Recorded in a `**Blocked by:**` line near the top of each ticket file (`None (can start immediately)` or ticket numbers/titles).
-- **Status**: Recorded in a `**Status:**` line near the top of each ticket file (`draft`, `ready-for-agent`, `in-progress`, `done`).
+- **Status**: Recorded in a `**Status:**` line near the top of each ticket file (`draft`, `blocked`, `ready-for-agent`, `in-progress`, `done`). `ready-for-agent` requires the readiness check of the Implementation Task Quality Standard ([`.agents/rules/05-implementation-task-quality.md`](../../.agents/rules/05-implementation-task-quality.md)).
 
 *(Note: When the optional Spec Kit workflow `/speckit-*` is used for large, multi-phase features, artifacts live under `specs/<NNN-feature>/` as `spec.md`, `plan.md`, and `tasks.md`.)*
 

@@ -40,11 +40,23 @@ Always include this repository's authoritative standards files in the **Standard
 - `.agents/rules/02-security-and-tenant-isolation.md`
 - `.agents/rules/03-testing-and-verification.md`
 - `.agents/rules/04-git-and-deployment-governance.md`
+- `.agents/rules/05-implementation-task-quality.md` (the task card, including field 13)
 - `docs/context/01-decisions.md`
 - `docs/context/04-business-rules.md`
 - `docs/context/07-fork-patches.md` (verify upstream LIP changes are logged)
 
 Also search the repo for any additional `CODING_STANDARDS.md` or `CONTRIBUTING.md` files.
+
+The Standards axis always applies the **compatibility and evolution checklist** of rule 01 §5. When the diff touches an API, schema, migration, contract or existing behaviour, each unmet item is a **hard** finding, not a judgement call:
+
+1. An impact inventory exists (task card field 13 or the Tier 2 fix plan) and matches the diff.
+2. Existing API responses, wire semantics, persisted data and approved behaviour are unchanged, or the break is owner-approved and has a migration plan.
+3. Migrations are additive or expand–contract, idempotent and concurrency-safe, and preserve existing data. New tenant tables have RLS.
+4. The tenant-isolation, ledger-immutability, authorization, concurrency and idempotency invariants hold.
+5. Every affected existing behaviour has a regression test and every changed contract a contract test. No existing test was weakened or deleted to pass.
+6. No speculative abstraction or premature service exists without a cited requirement.
+7. Performance and operational impact are stated where they apply.
+8. Failure modes and rollback or recovery are documented.
 
 On top of whatever the repo documents, the Standards axis always carries the **smell baseline** below: a fixed set of Fowler code smells (_Refactoring_, ch.3) that applies even when a repo documents nothing. Two rules bind it:
 
@@ -73,8 +85,8 @@ Issue both sub-agent calls together, in the foreground, and aggregate the report
 **Standards sub-agent prompt** should include:
 
 - The full diff command and commit list.
-- The list of standards-source files you found in step 3, **plus the smell baseline from step 3** pasted in full (the sub-agent has no other access to it).
-- The brief: "Report, per file/hunk where relevant, (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls: documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words."
+- The list of standards-source files you found in step 3, **plus the compatibility and evolution checklist and the smell baseline from step 3**, both pasted in full (the sub-agent has no other access to them).
+- The brief: "Report, per file/hunk where relevant, (a) every place the diff violates a documented standard: cite the standard (file + the rule); (b) every unmet item of the compatibility and evolution checklist, as a hard violation when the diff touches an API, schema, migration, contract or existing behaviour; and (c) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls: documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 500 words."
 
 **Spec sub-agent prompt** should include:
 

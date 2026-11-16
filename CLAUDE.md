@@ -1,29 +1,16 @@
-# CLAUDE.md — Claude Code Compatibility Bridge
+# CLAUDE.md — Claude Code Entry Point
 
-> **Canonical Operating Manual**: [`AGENTS.md`](AGENTS.md) is the primary, agent-neutral operating manual for this repository.
-> **Engineering Constitution**: [`.specify/memory/constitution.md`](.specify/memory/constitution.md) is the binding engineering charter for all specifications, plans, tasks, and code changes.
+[`AGENTS.md`](AGENTS.md) is the canonical, agent-neutral operating manual, and [`.specify/memory/constitution.md`](.specify/memory/constitution.md) is the highest governing authority. This file only loads them, plus the always-on rules, into every Claude Code session. Do not add workflow rules here: change `AGENTS.md`, the rules or the constitution instead.
 
----
+@AGENTS.md
+@.specify/memory/constitution.md
+@.agents/rules/01-architecture-and-upstream.md
+@.agents/rules/02-security-and-tenant-isolation.md
+@.agents/rules/03-testing-and-verification.md
+@.agents/rules/04-git-and-deployment-governance.md
+@.agents/rules/05-implementation-task-quality.md
 
-## 1. Mandatory Reading Order & Authority
+## Claude Code specifics
 
-Before proposing plans, writing specifications, or modifying code, read these files in order:
-
-1. [`AGENTS.md`](AGENTS.md) — Canonical agent workflow, 3-tier task classification, approval gates, codebase map, and golden rules.
-2. [`.specify/memory/constitution.md`](.specify/memory/constitution.md) — Binding 10-article engineering constitution.
-3. [`docs/agents/domain.md`](docs/agents/domain.md) and [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md) — LIP skill configuration for domain vocabulary, decisions, and local `.scratch/<feature-slug>/` spec/ticket tracking.
-4. [`docs/context/README.md`](docs/context/README.md) — Context pack index and order of authority:
-   - (1) [`docs/context/01-decisions.md`](docs/context/01-decisions.md) (`PD-001` through `PD-009`+; only **Approved** decisions are binding)
-   - (2) [`spec/`](spec/) (`/lip/v1` normative protocol specification)
-   - (3) [`docs/context/04-business-rules.md`](docs/context/04-business-rules.md) (binding `MUST` domain invariants)
-   - (4) [`docs/context/00-product-brief.md`](docs/context/00-product-brief.md), [`02-lip-architecture-map.md`](docs/context/02-lip-architecture-map.md), [`03-gap-analysis.md`](docs/context/03-gap-analysis.md) (`G-01`..`G-14`), [`05-glossary.md`](docs/context/05-glossary.md), [`06-roadmap.md`](docs/context/06-roadmap.md), and [`07-fork-patches.md`](docs/context/07-fork-patches.md) (`FP-001`+).
-
----
-
-## 2. Agent Environment & Skill Compatibility
-
-- **Primary Coding Agent**: Google Antigravity (`agy`).
-- **Default Day-to-Day Workflow Skills (Matt Pocock Suite)**: Curated and adapted in [`.agents/skills/`](.agents/skills/) (`ask-matt`, `grilling`, `grill-with-docs`, `domain-modeling`, `diagnosing-bugs`, `tdd`, `codebase-design`, `code-review`, `improve-codebase-architecture`, `implement`, `to-spec`, `to-tickets`, `research`, `prototype`, `pr`, `retro`, `wait-what`, `handoff`).
-- **Optional Workflow for Large / Complex Features (Spec Kit)**: Located in [`.agents/skills/speckit-*`](.agents/skills/).
-- **Published Upstream Consumer Skills**: Located in [`skills/lip*`](skills/) (for external developers integrating with LIP).
-- **Legacy Claude Code Skills**: Preserved untouched in [`.claude/skills/`](.claude/skills/). Where any skill instruction differs from the approval gates, domain paths, or git rules in [`AGENTS.md`](AGENTS.md) and [`.specify/memory/constitution.md`](.specify/memory/constitution.md), **`AGENTS.md` and the Constitution prevail**.
+- **Skills.** Claude Code loads `.claude/skills/`, which holds the legacy Phase 0 skills and Spec Kit's Claude integration copies of `speckit-*`. The curated, LIP-adapted skills live in `.agents/skills/`. When a skill of the same name exists in both, or only in `.agents/skills/` (for example `to-spec`, `to-tickets`), read and follow `.agents/skills/<name>/SKILL.md`.
+- **Delegation.** Dispatch lanes from `.delegate/config.json` with the user-level `codex-delegate`, `claude-delegate` or `agy-delegate` skills (`AGENTS.md` §5).

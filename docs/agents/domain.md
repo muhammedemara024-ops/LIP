@@ -18,8 +18,9 @@ Whenever a skill refers to `GLOSSARY.md` or `docs/adr/`, use these authoritative
 
 ## 2. Order of Authority When Files Disagree
 
+The [constitution](../../.specify/memory/constitution.md) is the highest governing authority for engineering and process; [AGENTS.md](../../AGENTS.md) and the always-on rules define the workflow under it. For product and protocol content, follow `docs/context/README.md`:
+
 1. [`docs/context/01-decisions.md`](../context/01-decisions.md) (Approved decisions)
 2. [`spec/`](../../spec/) (LIP normative `/lip/v1` protocol specification)
 3. [`docs/context/04-business-rules.md`](../context/04-business-rules.md)
-4. [`.specify/memory/constitution.md`](../../.specify/memory/constitution.md) and [`AGENTS.md`](../../AGENTS.md)
-5. All other documentation
+4. All other documentation

@@ -5,7 +5,7 @@ not implement as if approved), **Superseded**.
 
 ---
 
-## PD-001 — Universal customer account — Approved
+## PD-001 — Universal customer account — Approved; amended 2026-11-14 (A1: category-agnostic platform, cafés and restaurants pilot)
 
 One customer account on the platform (phone number + OTP). Inside it the customer
 holds a separate loyalty card per business.
@@ -27,6 +27,25 @@ Data shape (intent):
 **Impact on LIP:** LIP's customer identity is keyed per tenant
 (`{tenant_id, issuer, subject}` → customer). PD-001 needs a platform-level
 identity *above* tenants. See gap G-01 in `03-gap-analysis.md`.
+
+### Amendment A1 — 2026-11-14: category-agnostic platform, cafés and restaurants pilot
+
+Context: PD-046 item 10 (2026-11-13) made merchant branding category-agnostic and flagged the platform's target market to the owner.
+
+Decision (owner-approved):
+1. The platform is architecturally category-agnostic and should support different types of merchants.
+2. The initial operational pilot stays focused on cafés and restaurants.
+3. Documentation distinguishes general platform capability from initial pilot scope.
+
+Recorded consequences (written by the agent to apply the decision; not separately approved, the owner may object):
+- A merchant is a tenant, the glossary's "Business", as already defined in PD-046 item 10. LIP's protocol `merchant_id` and `brand_id` order fields keep their `spec/` meaning.
+- Requirements written for cafés describe the pilot. Architecture, data model and contracts must not assume a business category.
+- Extending a café-specific operational rule (for example a foodservice-profile rule) to other categories needs its own decision.
+- Rules 1–8 above are unchanged.
+
+Consequences: the product brief's target-market row, the glossary's Business row and a terminology clarification in `specs/002-p0-prd/spec.md` were updated on 2026-11-14. `AGENTS.md` §1 and constitution Article I still describe the platform as for cafés and restaurants; changing them needs a separate owner instruction (the constitution has its own amendment process).
+
+Date / approved by: 2026-11-14, project owner.
 
 ---
 
@@ -288,7 +307,8 @@ Consequences:
 
 *Abuse limits* (approved by PD-020 as platform-fixed values)
 - Egyptian mobile numbers only (`+20 1x…`); 6-digit code valid 5 min; resend
-  cooldown 60 s; per phone ≤ 5 sends/hour and ≤ 10/day; ≤ 5 wrong attempts per
+  cooldown 60 s; per phone ≤ 5 sends in any rolling 60 minutes, shared across
+  WhatsApp and SMS and all OTP purposes (clarified 2026-11-13 by PD-042), and ≤ 10/day; ≤ 5 wrong attempts per
   code; per-IP and per-device limits.
 - Bot check (Cloudflare Turnstile) before the first send.
 - Platform-wide circuit breaker: global daily caps on OTP sends and on OTP
@@ -325,7 +345,7 @@ Consequences:
 
 Date / approved by: 2026-11-06, project owner.
 
-## PD-005 — Billing provider: Kashier — Approved (2026-11-06); amended 2026-11-06 (A1: manual billing at launch, Kashier deferred); amended 2026-11-12 (A2: subscription stage permissions)
+## PD-005 — Billing provider: Kashier — Approved (2026-11-06); amended 2026-11-06 (A1: manual billing at launch, Kashier deferred); amended 2026-11-12 (A2: subscription stage permissions); amended 2026-11-13 (A3: stage permissions for settings, branch, access-recovery and program-draft actions); amended 2026-11-13 (A4: no new pending claims while suspended); amended 2026-11-14 (A5: brand palette changes in every stage; A5 refined the same day: U-1, U-2, U-6)
 
 Context: upstream LIP ships Stripe only; Stripe does not onboard
 Egyptian-resident businesses directly.
@@ -465,6 +485,89 @@ Consequences:
   at runtime on the pinned commit.
 
 Date / approved by: 2026-11-12, project owner.
+
+### Amendment A3 — 2026-11-13: stage permissions not listed in A2
+
+Context: A2 fixes ten actions. The P0 owner API (`specs/002-p0-prd/contracts/owner-api.md`) has further owner actions that A2 does not list. At Gate 2 the agent proposed cells for them by applying A2's pattern; the project owner approved them on 2026-11-13 with two refinements (Q5, Q6). A2's ten rows are unchanged.
+
+Decision: these cells extend the A2 table (✓ allowed, ✗ refused; same Cairo stage days).
+
+| Action | Grace | Read-only | Suspended |
+| --- | --- | --- | --- |
+| Change the main language setting | ✓ | ✓ | ✓ |
+| Change the amount label setting | ✓ | ✓ | ✓ |
+| Change the large-bill threshold (FR-025) | ✓ | ✓ | ✓ |
+| Change reward expiry, 7–90 days (FR-045; a reward change under FR-048) | ✓ | ✗ | ✗ |
+| Create a branch | ✓ | ✗ | ✗ |
+| Update a branch's names or opening hours | ✓ | ✓ | ✓ |
+| Deactivate a branch (protective, FR-081) | ✓ | ✓ | ✓ |
+| Reactivate a branch | ✓ | ✗ | ✗ |
+| Issue a device enrollment code (registers a device) | ✓ | ✓ | ✗ |
+| Recover access of an existing staff profile: re-verify its phone, reset its PIN | ✓ | ✓ | ✓ |
+| Issue a PIN setup code for the existing owner staff profile (recovery) | ✓ | ✓ | ✓ |
+| First-time setup of the owner staff profile | ✓ | ✓ | ✗ |
+| Edit the program draft without publishing | ✓ | ✓ | ✗ |
+
+Rules:
+- Suspended allows only **recovery** of access for staff profiles (including the owner staff profile) and devices already registered and authorized before suspension. It never allows enrolling a new staff member or registering a new device. Adding staff stays refused in read-only and suspended (A2).
+- Publishing a program stays refused in read-only and suspended (A2, FR-048). A draft edited in read-only takes effect only when it is published after payment.
+- Denied actions return the existing BFF stage error (`403 stage_forbidden` with `details.stage`). The stage is computed and enforced in our layer, as A2 states.
+
+Consequences:
+- A suspended café can still honour rewards, void, correct, revoke and rotate QR on devices it already has. Replacing a lost or broken device needs a new enrollment, so it waits for payment (or uses another already-registered device).
+- OD-01 (PIN, session and code lifetimes; whether enrollment or PIN setup codes need owner step-up) is **not** resolved by this amendment; it stays an open owner decision.
+
+Date / approved by: 2026-11-13, project owner (proposed by the agent at Gate 2, refined by the owner for Q5 and Q6).
+
+### Amendment A4 — 2026-11-13: new pending claims while suspended
+
+Context: A2 refuses **confirming** a pending claim in the suspended stage, but does not say whether a customer may **create** one. The project owner approved refusing creation while suspended (JG-09, PD-040 C4, PD-041). On 2026-11-13 the owner approved recording that rule in this permission table (PD-042). A2's ten rows and A3's thirteen rows are unchanged.
+
+Decision: this cell extends the A2 and A3 tables (✓ allowed, ✗ refused; same Cairo stage days).
+
+| Action | Grace | Read-only | Suspended |
+| --- | --- | --- | --- |
+| A customer creates a new pending claim at a branch (Method A, `contracts/customer-api.md` § Pending claims) | ✓ | ✓ | ✗ |
+
+Rules:
+- Grace and read-only keep today's behaviour: creating a claim stays allowed wherever A2 allows confirming one. A4 adds no restriction in those stages.
+- In the suspended stage, creation is refused with the existing stage error (`403 stage_forbidden` with `details.stage`), as A3's rule for denied actions states. No new error code is introduced.
+- A4 cancels no existing claim. A claim already open when the café becomes suspended keeps its 15-minute lifetime (FR-029). It cannot be confirmed while suspended (A2), so it expires.
+- A4 decides only claim creation. Other customer claim operations, such as reading a claim's status or cancelling one's own claim, are not stage cells here. They remain under JG-10/F-10.
+- Redemptions, voids, corrections, service recovery, revocation, QR rotation and A3 access recovery stay allowed when suspended, exactly as A2/A3 say.
+
+Consequences:
+- The stage table now has 72 cells: A2 30, A3 39, A4 3. FR-092, SC-008, PD-017, the planning artifacts (execution briefs, contracts, T028, T033, T046) and their tests use all three tables.
+- This settles PD-041's two open JG-09 items: the stage cell and the refusal contract. The JG-08 (before first publication) refusal contract is still not specified.
+
+Date / approved by: 2026-11-13, project owner (PD-042 item 1).
+
+### Amendment A5 — 2026-11-14: brand palette changes (PD-046 MB-03)
+
+Context: PD-046 lets the owner change the merchant's three brand colours (FR-136). A2–A4 have no cell for it.
+
+Decision: this cell extends the A2–A4 tables (✓ allowed, ✗ refused; same Cairo stage days).
+
+| Action | Grace | Read-only | Suspended |
+| --- | --- | --- | --- |
+| The owner changes or resets the merchant's brand palette (PD-046, FR-136) | ✓ | ✓ | ✓ |
+
+Rules:
+- Owner role only, with a valid, trusted and authorized owner session. An ordinary change needs no fresh one-time code.
+- CSRF protection on the browser request, rate limiting, and an audit row for every change and reset (FR-150).
+- *(Superseded 2026-11-14 by the refinement below.)* Additional verification (the existing owner step-up, `401 step_up_required`) is required when session trust or risk policy requires it.
+- *(Superseded 2026-11-14 by the refinement below.)* The risk trigger and the rate-limit value are **not yet defined**. They are open details of the `branding-contracts` gate (`specs/002-p0-prd/tasks.md`).
+- **Refinement (owner-approved 2026-11-14; PD-046 U-1, U-2, U-6):**
+  - Reauthentication (`401`, then owner sign-in) when the session is expired, invalid or revoked. No additional one-time code for ordinary changes and no risk-detection subsystem in P0.
+  - Per rolling 60 minutes, enforced atomically: at most 10 successful saved changes per merchant (resets and the onboarding save count; local previews do not) and 30 authenticated mutation attempts per owner account. Exceeded → `429` with a retry indication.
+- Agent note (not separately approved): a palette change moves no value and changes no access, so allowing it while suspended allows no action that A2–A4 deny.
+
+Consequences:
+- The stage table now has 75 cells: A2 30, A3 39, A4 3, A5 3.
+- T028 transcribes 72 cells and does not add actions outside A2–A4; `research.md` (stage enforcement) also says 72 cells. A reviewed revision at Gate 2 must add the A5 cells before T081 enforces this cell.
+- No error code is added.
+
+Date / approved by: 2026-11-14, project owner (PD-046 MB-03; proposed by the agent on 2026-11-13, refined by the owner with rate limiting and risk-based additional verification).
 
 ## PD-006 — Hosting split and Postgres provider — Approved (2026-11-06, conditional)
 
@@ -1107,7 +1210,7 @@ Date / approved by: 2026-11-12, project owner.
 Decision:
 - The manual billing core (task 5.5) is P0: payment records, set/extend the
   period, and the automatic stage engine.
-- Stages and their permissions follow PD-005 A2.
+- Stages and their permissions follow PD-005 A2, A3 and A4 (A4 added 2026-11-13, PD-042).
 - The owner sees the plan, end date and current stage in P0. The renewal
   reminder stays in task 6.2.
 
@@ -1150,7 +1253,7 @@ within the stated range; "platform-fixed" means only we can.
 | Setting | Approved value | Who can change it |
 | --- | --- | --- |
 | Pending claim lifetime / attempts | 15 minutes / 3 attempts | platform-fixed |
-| OTP | 6 digits, valid 5 min, resend after 60 s, 5 sends/hour and 10/day per number, 5 wrong attempts; plus IP/device limits, Turnstile and the circuit breaker (PD-004) | platform-fixed |
+| OTP | 6 digits, valid 5 min, resend after 60 s, 5 sends per number in any rolling 60 minutes (shared across WhatsApp and SMS and all OTP purposes; clarified 2026-11-13 by PD-042) and 10/day per number, 5 wrong attempts; plus IP/device limits, Turnstile and the circuit breaker (PD-004) | platform-fixed |
 | Large-bill threshold | 2,000 EGP; re-type above it; reject above 5 × | café setting |
 | Void window | 10 minutes | platform-fixed |
 | Rewards per order | 1 | platform-fixed (PD-015) |
@@ -1413,7 +1516,7 @@ Decision:
 
 Date / approved by: 2026-11-12, project owner.
 
-## PD-029 — Product name placeholder — Approved (2026-11-12)
+## PD-029 — Product name placeholder — Approved (2026-11-12); amended 2026-11-13 (A1: working name for prototype work)
 
 Decision:
 - PRD v1.0 uses `[Product]` as the temporary product name.
@@ -1425,6 +1528,20 @@ Decision:
   preparation.
 
 Date / approved by: 2026-11-12, project owner.
+
+### Amendment A1 — 2026-11-13: working name for prototype work
+
+The owner approved Option B of `specs/002-p0-prd/prototype/1.5-entry-amendment-impact.md` on 2026-11-13.
+- Task 1.5 may **start** with the PD-043 working name ونيس — Wanees.
+  - The name is used only in user-visible copy and brand assets (PD-043 item 3).
+  - Every prototype screen shows a visible "working name — not final" label.
+- The final name (Arabic + Latin) is still approved as its own decision. It is checked for domain availability and for conflicts with Egyptian loyalty/POS brands and trademarks. It is required **before**:
+  1. the owner accepts the task 1.5 prototype;
+  2. rebrand task 2.1 and T058;
+  3. any other branding-dependent work outside the prototype.
+- The rest of PD-029 is unchanged. Upstream Crave branding is never reused.
+
+Date / approved by: 2026-11-13, project owner.
 
 ## PD-030 — Purchase amount corrections in P0 — Approved (2026-11-12)
 
@@ -1838,6 +1955,421 @@ Decision:
 
 Date / approved by: 2026-11-12, project owner (proposed by the agent the same
 day).
+
+## PD-039 — Gate 2 owner decisions: server money parser, amount input and display, entry gates — Approved (2026-11-13)
+
+Context: at P0 Gate 2 (`specs/002-p0-prd/gate2-owner-decisions.md`) the agent proposed decisions the approved sources left open. The project owner approved them on 2026-11-13. The stage-permission part of the same package is recorded as PD-005 A3.
+
+Decision:
+1. **Server money parser home.** The BFF owns the authoritative server-side amount parser and formatter in `apps/bff/src/money/` (digit normalization, decimal-string to integer piasters, PD-007 formatting). It repeats the T010 algorithm and passes the same T010 validation vectors. The web helper (`apps/web/src/lib/money`, `digits`) only previews and displays; the amount the BFF parses is the amount recorded. No shared workspace package is created, and nothing is added under `packages/*`.
+2. **Amount input grammar (refines PD-007 "up to two decimals").** After Arabic-Indic or Persian digits are normalized to Western digits, an amount is valid only as digits, optionally followed by `.` or `٫` and one or two digits. Forms such as `45.` and `.5`, thousands separators, signs and surrounding spaces are rejected, never guessed. A user interface may trim spaces or use a keypad that cannot produce invalid forms before calling the parser.
+3. **Money display has no thousands grouping (refines PD-007 money format).** Amounts are shown as in PD-007, with no grouping separator: `1250 ج.م` / `EGP 1250`, `1234567.89 ج.م`. Any later grouping is a display-only decision made with the prototype; stored amounts never change.
+4. **Implementation entry gates are retained.** `specs/002-p0-prd/plan.md` "Entry gates" stay exactly as written: roadmap 1.2–1.6, the final name, the `/speckit-checklist` run and T001 entry evidence precede any implementation task, the pure helpers included. There is no early-implementation exception.
+   - *Clarification 2026-11-13 (owner-approved; PD-029 A1):*
+     - The final-name bullet of `plan.md` Entry gates item 4 now reads "before 1.5 acceptance and before any branding-dependent work outside the prototype". This changes only when task 1.5 may start.
+     - Every implementation prerequisite in this item still comes before any implementation task, the pure helpers included: roadmap 1.2–1.6 including the accepted prototype, the final name, the `/speckit-checklist` run and T001 entry evidence.
+     - There is still no early-implementation exception.
+
+Consequences:
+- Integer piasters and no floating point are unchanged (golden rule 2). The BFF result is authoritative for every recorded amount.
+- OD-01 to OD-18 are not resolved by this decision. FP-003 stays not authorized.
+
+Date / approved by: 2026-11-13, project owner (proposed by the agent at Gate 2).
+
+---
+
+## PD-040 — JG consolidation: separable P0 policy boundaries — Proposed (2026-11-13); C1–C4 approved 2026-11-13 by PD-041
+
+Context: the owner submitted JG-01–JG-12 as **owner-proposed** decisions and requested conflict review and documentation updates. This is not an approval record. Approved PDs, PRD Gate 1 and Planning Gate approvals are preserved. The [consolidation assessment](../../specs/002-p0-prd/journeys/jg-consolidation-review.md) records every JG, conflicts and blocked follow-up decisions; it is not an executable recovery procedure.
+
+Candidate decisions (fully specified policy boundaries only; none is binding until explicit owner ratification):
+
+1. **C1 — Duplicate accounts (JG-05):** no automatic duplicate-account merge or loyalty-value transfer in P0. Flag suspected duplicates for support review. Do not destroy, copy or move balances/audit records as a duplicate-resolution action; any recovery/merge procedure requires separate owner approval and independent review before use. This does not freeze ordinary authorized expiry, redemption, void, correction or reconciliation, and does not suspend PII erasure/retention requirements. No owner adjustment becomes a transfer shortcut.
+2. **C2 — Existing owner (JG-07):** an invitation must not silently replace an existing café owner. Existing-owner conflicts require a separately explicitly authorized ownership-management process. This selects no replacement/reissue mechanism and does not resolve invite invalidation/races (F-07).
+3. **C3 — Before first publication (JG-08):** customers cannot join an active loyalty program, accrue real stamps/points or redeem rewards before the café's first program publication. Any preview must be clearly non-transactional. This does not prohibit non-transactional universal-account sign-in and selects no new API error contract.
+4. **C4 — Suspended pending claims (JG-09):** refuse creation of new customer pending claims while suspended. Preserve all permitted corrections, voids, redemptions and recovery actions under PD-005 A2/A3 and their normal security/accounting guards. This does not invent cancellation of existing claims or permit new/replacement staff-device enrollment under suspension.
+
+Consequences: JG-05/08/09 have review-ready policy text but still await owner approval; JG-07 remains partial because reissue/conflict procedures are unspecified. Remaining JGs are recorded in the assessment rather than as selected mechanisms or amendments: in particular no change to PD-004's reused-number risk, SC-001's invite-acceptance timer, PD-016's OTP-only messages or roadmap1.3's tap criterion is approved. Follow-ups F-01–F-07/F-10–F-12 are unresolved question records. OD-01–OD-18 remain open; FP-003 remains unauthorized. The historical 2026-11-13 scoped Gate2 approval in plan.md/tasks.md is preserved (six content-only cards, T059–T078 gate records, remaining cards blocked structure). This proposal grants no additional Gate2, Roadmap1.2–1.4 or implementation approval.
+
+Date / proposed by: 2026-11-13, project owner; approval pending. Independent review is required and cannot ratify these proposals.
+
+**Current disposition (2026-11-13, PD-041).** The owner approved C1–C4. The "still await owner approval" and "approval pending" wording above is historical: it records the state when this entry was proposed. Every mechanism, contract and follow-up named above is still open or blocked, as PD-041 lists.
+
+## PD-041 — Owner decisions on journey gaps JG-01–JG-12 — Approved (2026-11-13); policy principles only, mechanisms listed as blocked; JG-01 and JG-09 refined 2026-11-13 by PD-042
+
+Context: the roadmap 1.2–1.4 journey drafts raised gaps JG-01–JG-12 (`specs/002-p0-prd/journeys/README.md`). The owner's proposals for them were assessed in `specs/002-p0-prd/journeys/jg-consolidation-review.md` and PD-040. On 2026-11-13 the owner:
+- approved the recommended policies for JG-01, JG-02, JG-03 and JG-05 to JG-10, with their stated limitations;
+- kept JG-04 and JG-11 unresolved;
+- approved only part of JG-12.
+
+Decision:
+
+| JG | Approved policy (binding) | Limitations; still-blocked items (not approved) | Status |
+| --- | --- | --- | --- |
+| JG-01 OTP sends | All OTP purposes for one phone number share one per-number SMS budget: at most 5 SMS sends per rolling 60 minutes across all purposes. A purpose may set a stricter limit. | Every PD-004/PD-020 limit still applies to every channel: 5 sends/hour and 10/day per number, 60 s resend, one active code, 5 wrong attempts. No budget is raised and no extra WhatsApp send is permitted. Each step-up stays a fresh, action-bound code (FR-012, R-13), never reused to save sends. Open, F-01: whether a WhatsApp send plus its SMS fallback counts as one send or two; how failed or uncertain dispatches count; the window definition against PD-020's "per hour"; concurrent reservations. OD-01 and OD-05 also stay open. | Partially resolved |
+| JG-02 Onboarding timer | SC-001, PD-011 and roadmap 1.4 keep invite acceptance as the start. Two separate measures are also recorded: a diagnostic authenticated-setup interval (setup entry → published program + print-ready Branch QR) and the first successful stamp. Raw timestamps are kept, and no wait or error time is subtracted. | The diagnostic never substitutes for SC-001 or SC-009; no approved metric is amended. Open, F-02: the exact invite-acceptance event, and PD-011's "first-stamp time" wording. | Partially resolved |
+| JG-03 Customer number lost permanently | Support-assisted recovery is the direction, offered only through a separately approved verification mechanism. Possession of a new number alone never transfers or exposes historical value. | Until F-03 is approved, no support rebinding can run and no recovery is promised. F-03 covers ownership evidence, the verifier, binding, revocation, disputes, retention and legal task 0.10. | Partially resolved |
+| JG-04 Recycled number | — | **Unresolved.** PD-004's accepted MVP reused-number risk stands unchanged until a separately approved security design exists (F-04). The OTP-only baseline must not be presented as protecting a previous holder. | Unresolved |
+| JG-05 Duplicate accounts | PD-040 C1, as written. | Support triage tooling waits for F-05: minimal fields, access, audit and retention. Any future merge or value movement needs its own reviewed procedure and owner approval. | Approved |
+| JG-06 Owner recovery | New-phone owner recovery requires verified café ownership plus independent security checks. These are added to FR-142's requirements: out-of-band check, revocation of every owner session, audit. An SMS OTP alone is never sufficient. A second owner is never created (PD-014). | F-06 mechanism blocked: evidence, independent check, authorized operator, new-phone binding, revocations, stage scope, disputes, retention, legal task 0.10. No recovery invite is selected. OD-01 stays open. | Partially resolved |
+| JG-07 Existing owner | PD-040 C2, as written. | Open, F-07: reissue invalidation; concurrent accept and reissue; whether any P0 ownership-change process exists. | Partially resolved |
+| JG-08 Before first publish | PD-040 C3, as written. | The customer-facing refusal contract is not specified, and none is chosen here. | Approved |
+| JG-09 Suspended claims | PD-040 C4, as written: while the café is suspended, customers cannot create new pending claims. | Existing claims are not cancelled by this rule. Not yet done: the refusal contract, and recording this stage cell beside PD-005 A2/A3 (see Consequences). | Approved |
+| JG-10 Customer rights across stages | A customer's read-only access to their own account and cards, their privacy rights and secure recovery are universal-account rights, not café billing entitlements. They continue in every subscription stage. Value-changing café actions keep their own stage guards (PD-005 A2/A3, FR-073). | Before any customer operation is wired, F-10 must map it to a stage cell; no cell is inferred. The operations: sign-in, card and code display, name/language/consent edits, customer device enrollment and revocation, sign-out-all, phone change, erasure, migration accept/decline. Recovery mechanisms stay blocked (F-03, F-04, F-06). Erasure still waits for unfinished voids (FR-008). | Partially resolved |
+| JG-11 Cashier taps | — | **Unresolved.** The roadmap 1.3 criterion stands unchanged: each step ≤ 2 taps on a cheap Android phone. The proposed benchmark scope and synthetic Android profile remain proposals (F-11). | Unresolved |
+| JG-12 Wizard ranges and expiry indicator | In principle only: the customer app shows an in-app indicator for issued rewards that expire within 7 days. No external reminder (WhatsApp, SMS or push) is sent. PD-016 and FR-140 are unchanged. | Open, F-12: the indicator's window semantics (elapsed versus Cairo-calendar days, inclusive edges, rewards issued with a 7-day expiry, already-expired items), notification-boundary details, and the numeric wizard ranges (stamp threshold, points earn-rate form and bounds, maximum reward cost). Unchanged: points `warning_days: [30]`, reward expiry 30 days (7–90), stamps never expire. | Partially resolved |
+
+Consequences:
+- **Counts:** approved 3 (JG-05, JG-08, JG-09); partially resolved 7 (JG-01, JG-02, JG-03, JG-06, JG-07, JG-10, JG-12); unresolved 2 (JG-04, JG-11).
+- **PD-040:** its candidates C1–C4 are approved by this entry.
+- **No other amendment:** no other PD, PRD requirement, success criterion or roadmap criterion is amended.
+- **Text still to write:** some approved policies need PRD, contract or task-package text: the JG-08 and JG-09 refusal contracts, the JG-09 stage cell, the JG-12 indicator and the JG-02 diagnostic. Each is a separate change with its own review. Until then, implementers use nothing beyond this entry and the existing contracts.
+- **JG-09 stage cell:** it is a stage permission outside PD-005 A2/A3. PD-017 refers to "A2 and A3", while FR-092 currently cites only PD-005 A2. That existing A2/A3 reconciliation is still pending and is not amended here. Task T028 transcribes exactly the 69 A2/A3 cells. Recording the cell consistently needs owner direction, for example a PD-005 amendment plus a reviewed update to execution-briefs.md and T028/T046.
+- **Unchanged gates:** OD-01–OD-18 stay unresolved; FP-003 stays not authorized; the points-pilot gates are unchanged.
+- **No approval of anything else:** this entry does not approve roadmap 1.2–1.4, adds no Gate 2 approval, and authorizes no implementation, commit, push or deployment.
+
+Date / approved by: 2026-11-13, project owner.
+
+**Current disposition (2026-11-13, PD-042).** PD-042 refines two rows of the table above:
+- **JG-01:** the per-number limit is 5 OTP sends in any rolling 60 minutes, shared across WhatsApp and SMS and all OTP purposes. This replaces the SMS-only wording above. JG-01 stays partially resolved: transport and failure accounting stay open under F-01.
+- **JG-09:** the stage cell and the refusal contract are now recorded in PD-005 A4.
+
+The counts stay 3 approved, 7 partially resolved and 2 unresolved.
+
+## PD-042 — Owner follow-up decisions: PD-005 A4, field 13 for six cards, JG-01 rolling window, Article XI confirmation — Approved (2026-11-13)
+
+Context: the PD-041 report (2026-11-13) asked the owner four follow-up questions. The owner approved all four the same day.
+
+Decision:
+1. **PD-005 A4 (JG-09).** A customer cannot create a new pending claim while the café is suspended. This is recorded as PD-005 A4. The authoritative stage-permission matrix, PD-017, FR-092, SC-008, the stage-permission briefs, the contracts, T028/T033/T046 and their tests are updated to match. Every existing A2/A3 permission is preserved.
+2. **Field 13 for T001, T002, T010, T035, T048 and T058, review-only.**
+   - The rule 05 field 13 "Compatibility and evolution" assessment is added to these six Gate 2 content-approved cards. Their approved scope is preserved.
+   - Sol (`plan-review`) independently reviews the additions.
+   - Any breaking change or scope expansion that the review finds goes back to the owner. It is never silently re-approved.
+   - Adding field 13 does not re-grant or widen the cards' Gate 2 content approval.
+3. **JG-01 rolling window.**
+   - One limit applies per phone number: at most 5 OTP sends in any rolling 60-minute window. It is shared across WhatsApp and SMS and across all OTP purposes.
+   - The 10-per-day cap, the 60-second resend interval and the required fresh, action-bound step-up verification (FR-012) are unchanged.
+   - This clarifies PD-004's and PD-020's "5 sends/hour" without raising any budget.
+   - Transport and failure accounting stay unresolved under F-01 and are not invented here. F-01 covers whether a WhatsApp send followed by SMS fallback counts as one send or two, how failed or uncertain dispatches count, and concurrent send reservations.
+4. **Constitution Article XI, version 1.2.0, confirmed.** The owner confirms the scalability, extensibility, backward-compatibility and regression-safety principle recorded on 2026-11-13. Articles I–X and the existing approval hierarchy are preserved.
+
+Consequences:
+- **JG status:** JG-09 stays Approved and is now fully recorded (PD-005 A4). JG-01 stays Partially resolved, with F-01 narrowed to transport and failure accounting. The counts stay 3 / 7 / 2.
+- **PRD:** the approved PRD (`specs/002-p0-prd/spec.md`) is amended in place only where items 1 and 3 require it: the stage-table references (US9, FR-092, SC-008) and the suspended-claim edge case. No other requirement changes.
+- **Unchanged gates:** OD-01–OD-18 stay unresolved. FP-003 stays not authorized; the point-lot attribution algorithm stays unresolved.
+- **No other approval:** this entry does not approve roadmap 1.2–1.4, adds no Gate 2 approval, and authorizes no implementation, migration, commit, push or deployment.
+
+Date / approved by: 2026-11-13, project owner.
+
+## PD-043 — Working product name "ونيس — Wanees" — Approved (2026-11-13) as a working name only; PD-029 unchanged
+
+Context:
+- PD-029 keeps `[Product]` as the placeholder. It requires a **final** Arabic and Latin name, checked for domain availability and for conflicts with Egyptian loyalty/POS brands and trademarks, approved as its own decision before task 1.5 and any branding-dependent work.
+- On 2026-11-13 the owner adopted a provisional working name to continue entry-gate preparation.
+
+Decision:
+1. **Working name.** The working name of the restaurant and café loyalty SaaS is **ونيس** (Arabic) / **Wanees** (Latin).
+   - It is a working name only.
+   - It is **not** a final commercial brand and **not** legally cleared.
+   - No domain-availability, trademark or brand-conflict check has been done. This entry claims none.
+2. **The final-name gate is unchanged.**
+   - The working name does **not** satisfy the PD-029 final-name decision, the roadmap 1.5 criterion "final product name (Arabic + Latin) approved before this task starts", or the `final-name` gate in `specs/002-p0-prd/tasks.md` (T058, rebrand task 2.1).
+   - Using the working name to start task 1.5 requires a **separate owner-approved amendment** to PD-029. None is approved here. The options are in `specs/002-p0-prd/prototype/1.5-prototype-brief.md`.
+   - Until the final name is approved, existing planning artifacts keep `[Product]`. They are not renamed.
+   - *Update 2026-11-13:* PD-029 A1, approved by the owner, now lets task 1.5 start with the working name. The final name is still required before the prototype is accepted, before T058 and rebrand 2.1, and before other branding-dependent work.
+3. **Branding is kept separate from the engine and contracts, so that renaming stays safe.** The product name (working or final) is presentation only.
+   - **Not allowed in:**
+     - `/lip/v1`, `spec/` or the LIP engine;
+     - BFF, owner, customer, staff or operator API paths, fields, error codes or event names;
+     - database schemas, tables, columns, roles, policies, GUCs or migration names;
+     - business-ID or ID-prefix formats and idempotency keys (this includes any replacement for upstream `crv_*` prefixes chosen in roadmap 2.1);
+     - environment variable or secret names;
+     - package or module names;
+     - business logic or conditions.
+   - **Allowed in:** user-visible copy, brand assets, and page or marketing metadata only.
+   - Renaming the product therefore changes no contract, persisted data or behaviour (constitution Article XI).
+   - **Delivery mechanism: Proposed, not approved.** Supplying the name through one brand value per locale (Arabic, English) is the proposed mechanism. It is not approved.
+
+Consequences:
+- **Still open:**
+  - the PD-029 final-name decision, including domain and trademark checks;
+  - roadmap 1.5 and its entry conditions;
+  - the `final-name` gate, which still blocks T058.
+- **Nothing else is decided:**
+  - JG-04, JG-11 and OD-01–OD-18 stay unresolved.
+  - FP-003 stays not authorized; the point-lot attribution algorithm stays unresolved.
+  - This entry approves no roadmap task, gate, prototype work, implementation, migration, commit, push or deployment.
+
+Date / approved by: 2026-11-13, project owner (item 1, and the separation principle in item 3). Item 2 records the existing PD-029 gate unchanged. The item 3 delivery mechanism is Proposed.
+
+## PD-044 — Prototype format, locales and accessibility target — Approved (2026-11-13)
+
+Context: item P4 of the roadmap 1.5 entry package (`specs/002-p0-prd/prototype/1.5-entry-amendment-impact.md`). The owner approved it on 2026-11-13 and chose accessibility scope (b), covering the prototype and the shipped product.
+
+Decision:
+1. **Format.** The roadmap 1.5 prototype is made in **Figma**: an editable source plus a clickable prototype.
+   - It lives in a non-production workspace and holds fictional data only: no credentials, real customer data or merchant keys.
+   - Account ownership, access and any cost are recorded when the workspace is set up. The PD-006 cap covers deployment services, not this tool.
+2. **Locales.** Every screen exists in Arabic RTL (the default) and English LTR. This restates FR-130 and PD-007.
+3. **Accessibility.** **WCAG 2.2 Level AA** is the target for the prototype **and** for the shipped P0 product.
+   - The PRD gains FR-134 and SC-018.
+   - Every UI task card needs re-reviewed AA acceptance criteria and tests before it can be ready (the `accessibility` gate in `specs/002-p0-prd/tasks.md`).
+   - A design file shows design-level criteria only. Conformance of the shipped UI is shown only on implemented screens.
+4. **Authentication review**, which the owner asked for, with no silent change to PIN or OTP. The W3C *Understanding SC 3.3.8 Accessible Authentication (Minimum)* says:
+   - remembering a site-specific password is a cognitive function test;
+   - a service that requires manual transcription of a verification code does not comply;
+   - users must at least be able to paste the code, and browsers must be allowed to fill it;
+   - blocking paste, or blocking password-manager fill, fails the criterion unless an alternative is provided.
+
+   What this means here:
+   - **One-time codes** (customer and owner sign-in, owner step-up, account deletion, phone change, staff phone verification): the code field must allow paste and browser autofill. This is a UI constraint only. The OTP rules (PD-004, PD-020, PD-042, FR-010) do not change.
+   - **Staff PIN** (FR-014, FR-016, PD-010): a remembered, café-specific PIN is likely a cognitive function test. To conform, the PIN step needs an alternative or an assisting mechanism, for example not blocking paste or password-manager fill. On shared branch devices that may weaken per-staff accountability.
+   - **Open: A11Y-01, an owner decision.** Until it is decided, FR-014 and PD-010 are unchanged, the PIN screens are marked decision-dependent in the prototype, and no AA conformance is claimed for the staff sign-in step.
+5. **Branding isolation** is unchanged (PD-043 item 3). The one-brand-value-per-locale mechanism stays Proposed.
+
+Consequences:
+- Entry-gate CHK018 (accessibility scope) is decided.
+- A11Y-01 is open.
+- No JG, OD or F-item changes. FP-003 stays not authorized.
+
+Date / approved by: 2026-11-13, project owner (items 1–3; item 4 records the review the owner requested and leaves A11Y-01 open).
+
+## PD-045 — Roadmap 1.3/1.4 measurement split, conditional journey acceptance, start of task 1.5 — Approved (2026-11-13)
+
+Context: item P3 of the roadmap 1.5 entry package, and the owner's authorization of 2026-11-13.
+
+Decision:
+1. **Measurement split.** Roadmap 1.3 and 1.4 each have two parts:
+   - (a) the journey documentation, accepted by the owner;
+   - (b) measurement on a versioned, testable 1.5 measurement prototype.
+
+   The thresholds are unchanged: each cashier step takes ≤ 2 taps on a cheap Android phone, and owner onboarding takes under 15 minutes, timed from invite acceptance. 1.3 and 1.4 are done only when (a) and (b) are both recorded. Task 1.5 depends on 1.2, 1.3 (a) and 1.4 (a).
+2. **Conditional acceptance (2026-11-13).** These are accepted as conditional drafts: 1.2 (`journeys/1.2-customer-journey.md` and `journeys/1.2-recovery-procedures.md`), 1.3 (a) and 1.4 (a).
+   - Every unresolved item stays open: JG-04, JG-11, F-01–F-12 (with F-03, F-04, F-06 and F-10 blocked), OD-01–OD-18 and FP-003.
+   - Acceptance approves no blocked mechanism and records no measurement.
+3. **Measurement evidence.**
+   - Prototype tests may provisionally assess screen navigation and tap counts.
+   - Physical-device performance, camera operation, OTP delivery and service-dependent timing need later verification on the real app.
+   - No measurement is claimed without evidence.
+   - **Open: M-01, an owner decision.** Where does the real-app verification sit in the roadmap? Can 1.3 (b) and 1.4 (b), and so M1, be recorded as done on the provisional prototype evidence, with the real-app items carried forward? This matters because M1 must come before any implementation (`plan.md` Entry gates). Holding 1.3 and 1.4 open until real-app verification would block implementation indefinitely.
+4. **Authorization.** Roadmap 1.5 may start, for **prototype design only**:
+   - in a non-production workspace, with fictional data;
+   - following `specs/002-p0-prd/prototype/1.5-prototype-brief.md` and governance.
+
+   No application implementation, migration, staging, commit, push or deployment is authorized.
+
+Consequences:
+- **Updated:**
+  - roadmap rows 1.2–1.5;
+  - `plan.md` Entry gates item 4 (PD-029 A1);
+  - the `tasks.md` `final-name` and `accessibility` gates;
+  - the PRD Dependencies line;
+  - the journey drafts.
+- **Status:**
+  - 1.5 is started, not accepted;
+  - 1.3 (b) and 1.4 (b) are NOT RUN.
+- **Still open:** the final name, F-02, F-11, F-12, the 1.6 plan values, A11Y-01 and M-01.
+
+Date / approved by: 2026-11-13, project owner.
+
+## PD-047 — Backend-first, UI-last sequencing; U-b — Approved (2026-11-15)
+
+Context: the owner approved Backend-first Amendment Revision 3 on 2026-11-15, then separately approved its revised Gate 2 plan/task package. This entry records the adopted sequencing decision; it does not authorize implementation or operational activity.
+
+Decision:
+1. **Backend entry (M1-B).** M1-B consists of BE-1–BE-7 in the approved Revision 3. It precedes T001. T001 records BE-8 as its output; it does not depend on its own output. Subsequent implementation tasks inherit T001 and retain their own Gate 2 content, field 13, prerequisites and separate named implementation authorization.
+2. **Scoped supersession of PD-039 item 4.** Only its sequencing requirement is superseded: backend tasks may enter after M1-B and T001 without waiting for roadmap 1.3(b), 1.4(b), accepted 1.5 or the final name, except where a task's own explicit gate (including plans-values, final-name, legal, security or operations) requires them. No pure-helper exception bypasses M1-B. All other PD-039 decisions remain unchanged.
+3. **Selected UI route (U-b).** Prepare T084's UI manifest before `ui-entry`; implement final UI after backend readiness and UI-entry conditions; assess and accept UX on the real staging application through T085. Roadmap 1.3(b), 1.4(b) and final 1.5 acceptance are completion evidence, not prerequisites for T084 or UI implementation.
+4. **Milestones.** Replace M1's entry/completion dual use with M1-B, M1-UI and M1-done as specified in `docs/context/06-roadmap.md`. Preserve historical M1/Phase 1 evidence. M1-done requires the carried roadmap evidence, including T085 staging UX acceptance, owner acceptance of final 1.5 UI, 1.6 plan values and the final name. M1-done does not gate work needed to produce that evidence.
+5. **PD-044 and PD-045 amendments.** The Figma prototype is no longer the pre-implementation UX measurement artifact for this route. Implemented UI and real-staging validation replace that measurement format/sequence only. WCAG 2.2 AA, Arabic RTL/English LTR, responsive/text-scale criteria, OTP paste/autofill, D1–D4, journeys and all thresholds remain. A11Y-01 remains unresolved; no PIN-step AA claim is inferred. PD-045's conditional journey acceptance and historical 1.3(b)/1.4(b) NOT RUN status remain intact; M-01's route question is settled by U-b, while M-01-staging protocol/placement and M-01-M5 remain open.
+6. **Unchanged gates and governance.** OD-01–OD-18, F-01–F-12 and JG limitations remain at their existing scopes; FP-003 remains unauthorized; legal, cost, company, messaging, deployment, data-use, restore, pilot and task-specific gates remain. G01 changes prospective review governance only and is not closed by this decision or the PD-047 review. No implementation, migration, staging, live messaging, deployment, commit, push or pilot is authorized.
+
+**Approval record:** The owner approved Revision 3 on 2026-11-15, and separately approved the bounded revised Gate 2 package on 2026-11-15. Adoption edits were authorized only after that Gate 2 approval. The independent plan-review verdict is evidence, not owner approval. At those approvals, checklist disposition, G01 independent review and named task authorizations remained outstanding.
+
+**Separate BE-5 owner disposition (2026-11-15):** The project owner explicitly approved the disposition of CHK001–CHK082 as presented in the Wanees decision package dated 2026-11-15. The item-level record is `specs/002-p0-prd/checklists/entry-gate-assessment.md` §G, preserving the original checklist, evidence and classifications. Satisfied items remain evidence-qualified; Partial, unresolved, Deferred and Consistency items remain open with their existing named tasks and gates. BE-5's checklist-run and owner-disposition requirement is met; this is not checklist-wide completion, resolution of any underlying product decision, a gate waiver, or implementation/operational authorization. BE-7's separate G01 independent review and separate named T001 authorization remain outstanding; T001 has not produced BE-8. (BE-7 closed 2026-11-16, PD-048 item 6.) This records the owner's bounded disposition under PD-047 without creating a new product decision.
+
+**Historical preservation:** PD-039, PD-044 and PD-045 retain their original dated text and approvals above. PD-047 is the later, precise amendment and does not rewrite those historical records.
+
+---
+
+## PD-046 — Multi-tenant dynamic merchant branding (MVP) — Approved (2026-11-13); MB-01–MB-05 Approved (2026-11-14); U-1–U-6 and corrections A–C Approved (2026-11-14)
+
+Context: On 2026-11-13 the owner added a P0 (MVP) requirement: each merchant chooses three brand colours, and the customer-facing loyalty experience takes on the selected merchant's palette while running on the shared platform.
+
+Decision (the owner's requirement, as approved):
+1. Every merchant (tenant) chooses exactly three brand colours during owner onboarding: primary (about 70 % visual dominance), secondary (about 25 %) and accent (about 5 %). The proportions are visual design guidance, not a rigid pixel-count rule.
+2. The palette is stored per merchant, never globally. All branches inherit their merchant's palette by default.
+3. Authorized merchant owners can preview, save and update the colours.
+4. A merchant with no palette uses the default: primary `#3A2419`, secondary `#E8C88A`, accent `#F59E0B`.
+5. Customer-facing screens are themed dynamically, including member cards, rewards, progress indicators and relevant merchant UI. With no merchant context selected, a neutral platform-level experience is kept.
+6. The shared customer account and the platform architecture are unchanged. Switching merchant context switches branding with no cross-tenant leakage.
+7. WCAG 2.2 AA is preserved through accessible derived text, surface and contrast colours (PD-044).
+8. Colour inputs are validated and sanitized. No merchant CSS or JavaScript is accepted.
+9. Cache isolation, backward compatibility and secure authorization are preserved.
+10. **Scope (owner clarification, 2026-11-13).** Branding applies to every merchant (tenant) of any business category, not only cafés and restaurants. The palette, the derivation rule, the tokens, the screens and their copy make no business-category assumption: no category-specific imagery, icons, names or colour presets. The demo merchants "Demo Café A" and "Demo Café B" are fictional test data and do not narrow the scope.
+    - **Owner statement, 2026-11-13:** the product vision is category-agnostic. The platform should be architecturally able to serve merchants of different business categories. The initial pilot may stay with cafés and restaurants. So: **platform capability** = any category; **pilot scope** = cafés and restaurants unless the owner widens it.
+    - Recorded as **PD-001 A1** (owner-approved 2026-11-14). The product brief and the glossary now distinguish platform capability from pilot scope.
+    - **Terminology:** in PD-046 and its artifacts, *merchant* = *tenant* = the glossary term "Business" (`tenant_id`). It is not a new entity. LIP's own `merchant_id` on orders and the server-held merchant credential keep their existing meanings.
+
+Decisions MB-01–MB-05. The agent proposed them under owner delegation on 2026-11-13; the proposals below are kept as history. **The owner approved MB-01–MB-05, PD-001 A1 and PD-005 A5 on 2026-11-14** (see "Owner approval" below). Where the approved wording differs from a proposal, the approved wording prevails. This approval is not Gate 2 approval and authorizes no implementation, contract, migration or Figma edit.
+
+- **MB-01: themed surfaces beyond customer screens.**
+  - *Decision:* theme only customer screens in a merchant context (MB-02 list) and the owner's palette preview (OWN-08, the OWN-17 preview). The counter (CSH-*) and the owner dashboard keep the platform appearance.
+  - *Alternatives:* theme the counter too; theme the dashboard too.
+  - *Why:* result, refusal and status colours stay identical for every cashier (roadmap 1.3 runs on a cheap shared Android phone); T042 and T045 need no revision; the customer is the audience PD-046 names. Theming more surfaces later is additive.
+  - *Risk:* owners may want a branded counter (low; reversible). *Confidence:* high.
+- **MB-02: platform appearance and merchant-context screens.**
+  - *Decision:*
+    - **Merchant context (themed):** CUS-01 (Branch QR landing; palette from the scanned Branch QR), CUS-04, CUS-06, CUS-07, CUS-08, CUS-09, CUS-10.
+    - **Platform appearance (default palette, platform W mark):** CUS-02 and CUS-03 (sign-in and one-time code, even when reached from a join), CUS-05 (card list; each tile carries its own merchant's colours and name), CUS-11–CUS-18 (account, devices, consent list, deletion, support, recovery).
+    - **Identity on themed screens:** the merchant's display name as text in the header, plus a small platform mark ("on Wanees", ST-05 rules apply). The large W mark appears only on platform screens.
+  - *Alternatives:* theme the sign-in screens from the join context; theme everything after a merchant is selected.
+  - *Why:* one consistent platform look on every authentication screen makes look-alike phishing pages easier to spot and keeps the shared account visibly platform-owned (PD-001). Value and code screens carry the merchant identity the owner asked for.
+  - *Risk:* a less "branded" join flow between CUS-01 and CUS-04 (low). *Confidence:* medium-high.
+- **MB-03: stage and authentication rule for a palette change.**
+  - *Decision:* allowed in every subscription stage, like the main-language and amount-label settings (PD-005 A3). Owner role only, in the normal authenticated owner session (CSRF-protected, PD-004/PD-005 session rules). **No fresh one-time code.** Every change and reset is audited (FR-150). Recorded as the proposed amendment PD-005 A5 below; the approved stage tables A2–A4 are unchanged.
+  - *Security reasoning (HIGH risk, authentication choice):* a palette change moves no value, exposes no personal data and changes no access. FR-137 limits input to `#RRGGBB` and FR-139 derives AA-safe pairs, so a hijacked session can at worst set an unwanted but accessible palette, visible in the audit log and undone by reset. A step-up code would add OTP cost (WhatsApp, PD-004) for no protected asset.
+  - *Alternatives:* fresh OTP for every change; block changes in read-only or suspended stages.
+  - *Risk:* defacement through a stolen owner session (low impact, audited, reversible). *Confidence:* medium-high.
+- **MB-04: branch-level palettes.**
+  - *Decision:* none in P0. Every branch uses its merchant's palette (backlog).
+  - *Why:* PD-046 item 2 says branches inherit; a per-branch palette adds a resolution rule and a leakage surface for no stated need. *Confidence:* high.
+- **MB-05: optional merchant logo upload.**
+  - *Decision:* **no logo upload in P0.** Merchant identity is the display name as text plus the palette. Logo upload is backlog, with the pre-agreed constraints below.
+  - *Options compared:*
+    - (a) no logo: no new surface;
+    - (b) optional logo: PNG or JPEG only, never SVG; byte and pixel caps; re-encoded on the server with metadata stripped; served from platform storage, never a merchant URL; a fixed slot with the name-text fallback; alt text from the merchant name;
+    - (c) logo plus other brand assets.
+  - *Why (a):* the approved plan has no object storage or image pipeline. Option (b) would add a storage dependency, an upload contract, image processing, a data-model change, content moderation and a new attack surface (decompression bombs, polyglot files). That is more than T080–T082 combined. It also conflicts with FR-137 as written ("no images"). The text-name fallback is needed in every option anyway.
+  - *Implications:* no card change. If the owner chooses (b), FR-137 needs an amendment and new task cards. *Confidence:* high for P0.
+
+Owner approval (2026-11-14), as approved. It prevails over the proposals above:
+- **MB-01 — Theme scope.** Merchant branding applies only to customer-facing screens in the merchant context and to the merchant owner's colour preview. Cashier, owner dashboard and administrative interfaces keep the standard platform theme.
+- **MB-02 — Platform and merchant branding.** Platform-level screens use the platform identity. Merchant-context customer screens use that merchant's branding. The shared customer card list keeps the platform theme, while each merchant tile shows its merchant's colours. The customer account stays unified.
+- **MB-03 — Owner colour editing.** Authorized merchant owners may update the three brand colours from Settings. Every change is securely audited. An ordinary colour update in a valid, trusted, authorized session needs no fresh one-time code. Appropriate authorization, CSRF protection where applicable and rate limiting are required, and additional verification is required when session trust or risk policy requires it.
+- **MB-04 — Branch inheritance.** All branches of a merchant inherit its palette. Branch-specific overrides are out of scope for P0.
+- **MB-05 — Merchant logo.** Logo upload is out of scope for P0; the merchant's name is shown as text. The UI stays extensible for an optional logo in a future phase, but P0 adds no upload infrastructure, image storage or image-processing requirement.
+- **PD-001 A1** is recorded under PD-001, and **PD-005 A5** under PD-005.
+- **Visual direction:** the Premium Figma design stays a temporary baseline. The default palette is Mocha Brown `#3A2419` (≈ 70 %), Champagne Gold `#E8C88A` (≈ 25 %) and Burnt Amber `#F59E0B` (≈ 5 %). Each merchant keeps the same hierarchy with its own colours. The percentages are approximate design dominance, and every derived foreground and background colour meets the applicable accessibility requirements.
+
+Agent application, not separately approved: the screen-by-screen classification presented with the MB-02 proposal above applies the approved MB-02 principle. The owner may object to any screen's classification. **Owner-approved later on 2026-11-14 as U-5, subject to corrections A–C below.**
+
+Open details, not decided (carried to the `branding-contracts` gate): the session-trust or risk trigger that requires additional verification for a palette change, and the rate-limit value. **Resolved later on 2026-11-14 by U-1, U-2 and U-6 below.**
+
+Owner approval of U-1–U-6 and engineering corrections A–C (2026-11-14). It covers decision documentation, contract revisions and validation only. It is not Gate 2 approval and authorizes no implementation.
+- **U-1 — Owner session verification.** Use the existing owner authentication architecture. A valid, authorized owner session is required. No additional OTP for ordinary colour changes. Reauthentication is required when the session is expired, invalid or revoked. No new risk-detection subsystem in P0. All existing session-security requirements are preserved.
+- **U-2 — Mutation attempt rate limiting (option B).** A small, dedicated server-side rate-limit counter table.
+  - 30 authenticated palette mutation attempts per rolling 60 minutes per owner account.
+  - 10 successful saved palette changes per rolling 60 minutes per merchant.
+  - Resets and onboarding saves count as successful changes; local previews do not.
+  - Concurrency safety through atomic database operations; exceeded limits are rejected with HTTP 429 and a retry indication.
+  - The counter cannot be reset by changing merchant context.
+- **U-3 — Idempotency and rejected responses.** HTTP 401, 403 and 429 are not persisted as completed idempotency results for branding mutation endpoints. Retries with the same key are processed against the current authentication, authorization and rate-limit state. Request-fingerprint checks and existing idempotency security rules are preserved.
+- **U-4 — CUS-10 branding (option A).** CUS-10 receives merchant colours through an authoritative, server-resolved merchant context. Client-supplied palette values are never trusted. Cross-tenant isolation and safe fallback are preserved.
+- **U-5 — MB-02 screen classification**, approved subject to corrections A–C.
+  - Platform identity stays on shared authentication, account, support and recovery screens; merchant identity applies to merchant-context customer screens.
+  - The CUS-05 card-list page stays platform-themed; individual tiles show their merchant's colours.
+  - CUS-01 uses merchant colours only after successful server-side Branch QR validation. Invalid, unknown, inactive or rotated Branch QR codes never expose a previous merchant's branding.
+- **U-6 — Successful change limit.** 10 successful saved palette changes per merchant per rolling 60 minutes, with atomic enforcement, not read-then-write checks vulnerable to race conditions.
+- **Correction A — CUS-09 after a reload.** CUS-09 keeps the correct merchant identity after a reload when the merchant context can be securely re-resolved. It does not switch to the platform theme merely because a claim response lacks palette fields. It falls back to the platform theme only when no valid, authorized merchant context can be established, and never reuses a previously selected merchant's palette.
+- **Correction B — 401 versus 403.** 401: no valid authenticated session is available to the endpoint. 403: an authenticated principal lacks the required role or permission. 401 is correct where cookie-domain separation makes a cashier unauthenticated on the owner site. 403 is not assumed unreachable.
+- **Correction C — Merchant context resolution.** Customers may select merchant memberships, follow merchant links or scan Branch QR codes. The server validates those identifiers and resolves the merchant context authoritatively. Client-supplied palette values, tenant authorization claims and unverified merchant context are never trusted. Tenant isolation, response-cache isolation and sign-out cleanup are preserved.
+
+Recorded consequences / agent note (2026-11-14; written by the agent, not separately approved):
+- The U-2 storage, authorization, concurrency, expiry, cleanup and tests are documented as a proposed design in `specs/002-p0-prd/gate2-branding-revision.md` §3.1 and §6 (not approved at Gate 2).
+- Updated in place: PD-005 A5 (refinement); `spec.md` Status, FR-136, FR-138, edge cases and Dependencies; journey 1.4; D1–D4; roadmap row 4.8.
+- Updated in place but still unapproved at Gate 2: the PD-046 draft blocks and T081/T082.
+- Gate 2 revisions not applied: T028 (72 → 75 cells), T046, the `stage-cells` row, `research.md` R-19, the `execution-briefs.md` totals, `contracts/README.md` rows and `data-model.md` §1 roles (package §5). Each carries a pending-revision pointer.
+- `branding-contracts` stays open. Sol's review is mandatory and has not run.
+
+Consequences:
+- **Updated in place, pending independent Sol review:**
+  - `spec.md`: FR-135–FR-139, SC-019, US1.8, US4.9–US4.10, a roles row, the Brand palette entity, edge cases, out-of-scope rows, open items and traceability;
+  - journey 1.4: step O4a;
+  - prototype D1–D4, the 1.5 brief (AC-13) and `figma-workspace-setup.md`;
+  - `tasks.md`: T080–T082 as blocked cards, gates `branding-decisions` and `branding-contracts`, dependency and coverage rows. No existing card changes.
+- **Drafted, not approved. Required before any branding task can be ready:**
+  - `plan.md`, `data-model.md`, `contracts/` and `execution-briefs.md` § T080: drafted on 2026-11-13 as "Proposed amendment (PD-046), not approved at Gate 2" blocks. They need Gate 2 approval.
+  - The roadmap: row 4.8 is a Proposed row (2026-11-13). It no longer depends on MB confirmation; Gate 2 still applies.
+  - PD-005 A5 adds 3 stage cells. T028 and `research.md` say 72; they need a Gate 2 revision before T081 enforces the palette cell.
+- **Unchanged:** every other approved decision and entry gate, all OD, F and JG items, A11Y-01, M-01, and FP-003 (not authorized). No implementation is authorized.
+
+Date / approved by: 2026-11-13, project owner (items 1–9; item 10 scope and the category-agnostic statement the same day). MB-01–MB-05, PD-001 A1 and PD-005 A5: 2026-11-14, project owner (proposed by the agent under delegation on 2026-11-13; MB-03 and MB-05 refined by the owner). U-1–U-6 and corrections A–C: 2026-11-14, project owner.
+
+## PD-048 — G02: temporary Claude-led orchestration and review governance; final-verdict retired — Approved (2026-11-16), temporary and reversible
+
+Context: Codex Sol (GPT-6.1 Sol High) is unavailable. Under G01 it was the orchestrator, `plan-review` and `final-verdict` model. On 2026-11-16 the owner authorized a temporary, reversible migration of Wanees orchestration and review governance from Codex Sol to Claude Code. The owner set the requirements: Opus 5.5 orchestrates; Sonnet 5.5 XHigh is `plan-review` for Opus-authored plans; no reviewer approves its own work, even across sessions; independent HIGH/CRITICAL review and the owner's implementation, push and deploy approvals are preserved; final-verdict is removed; history is preserved; the change is reversible. Items 2–3 below are how the orchestrator implements those requirements.
+
+Decision:
+1. **Orchestrator.** Claude Opus 5.5 High is the primary orchestrator. Codex Sol must not be invoked, retried or treated as a blocking dependency.
+2. **Independent review.** Independent review stays mandatory for HIGH/CRITICAL work, with evidence-based resolution and at most two follow-up rounds. It runs in a separate session with enforced read-only permissions, routed by the AGENTS §5 author→reviewer table:
+   - Opus-authored work (the orchestrator, `planning`, `migration-review`, `debate-sol`, `security-review-sol`, `critical-architecture-sol`) and `agy`-authored work go to `plan-review` (Sonnet 5.5 XHigh).
+   - Sonnet-authored work (`ui`, `review`, `docs-review`, `plan-review`, or a Sonnet fallback) goes to `migration-review` (Opus 5.5 High). That review runs in a fresh read-only session that is not the orchestrator's session.
+   - Work by any combination of authors is split by change set, and each part is routed as above. If the parts cannot be separated, it stays blocked for the owner.
+   - Re-reviews after fixes follow the same table.
+   - No reviewer approves work its own model authored, even across sessions.
+3. **final-verdict retired.** The separate final-verdict role and gate are removed from the active workflow.
+   - A material disagreement unresolved after two follow-up rounds keeps the task blocked and goes to the owner.
+   - A push still needs the owner's explicit push authorization. Every HIGH/CRITICAL change in it must already carry a passing independent review that covers the final pushed content; later edits need re-review.
+   - The `final-verdict` lane is removed from `.delegate/config.json`. Nothing in the repository dispatched it.
+4. **Unchanged.**
+   - Owner authorization for protected implementation tasks, commits, pushes and deployment.
+   - Every Tier 2/Tier 3 gate.
+   - The blocked Hydrogen XHigh `security-review` and `critical-architecture-hydrogen` lanes.
+   - The Fable and Argon rules.
+   - All other lane mappings.
+   - Historical reviews and evidence, including the G01 Sol reviews.
+5. **Reading older records.**
+   - **Open Sol requirements.** Where a dated record names a Sol review as an open requirement (for example PD-042, PD-046, `plan.md`/`execution-briefs.md` PD-046 blocks, or `.scratch/` drafts), that requirement is satisfied only by an independent review under item 2. No Sol review is required, and none may be invoked.
+   - **final-verdict premises.** A document whose premise is the `final-verdict` lane (for example `.scratch/review-gated-push/spec.md`) must be revisited before its next gate.
+   - **Generators.** Generators that would re-emit G01 text, such as `.scratch/governance-audit-2026-11-12/generate_tasks.py`, are historical and must not be re-run without updating them.
+6. **BE-7 (owner direction, 2026-11-16).** The owner's verbatim text, under "Phase 5 — Close BE-7 when eligible", is archived at `docs/context/evidence/G02-20261116/owner-authorization-verbatim.txt`. It reads (line breaks and list markers flattened):
+
+   > "Once the new governance and reviewer requirements are verified: Dispatch one focused independent `plan-review` through Claude Sonnet 5.5 XHigh. Review only the existing BE-7 delta: G01-19, G01-23 and G01-24. T083–T085 prerequisite wording. Post-adoption PD-047 and BE-5 documentation changes. Reuse the existing evidence. If the independent review passes, reconcile BE-7 documentation and close the gate according to the updated policy. If it fails, fix only the identified findings and obtain a fresh independent review. Do not automatically start T001."
+
+   - **Evidence.**
+     - The pre-adoption G01 independent PASS: `docs/context/evidence/G01-independent-review-result/final.txt`, 2026-11-15 15:47Z.
+     - The delta review: `docs/context/evidence/G02-20261116/review-BE7-delta/final.txt`, 2026-11-16. It returned **PASS** with 8 LOW findings, ran on the frozen pre-G02 snapshot in a separate read-only session, and reported `readOnlyViolation: false`.
+   - **The orchestrator's reading** of "the existing BE-7 delta" and of what satisfies BE-7's "separate G01 independent review": the 15:47Z G01 PASS together with the passing delta review.
+   - **Timing.** BE-7 stays open until G02 itself passes independent review ("once the new governance and reviewer requirements are verified") and a reconciliation edit records the closure.
+   - **Closure (2026-11-16).** Both conditions were met. G02 passed independent review in follow-up round 2 (`docs/context/evidence/G02-20261116/review-G02-followup2/final.txt`), and the BE-7 delta review passed. The reconciliation edit recorded BE-7 closed in `tasks.md`, `plan.md`, `backend-first-amendment.md` (BE-7 closure record), `entry-gate-assessment.md`, `entry-gate.md`, `docs/context/06-roadmap.md` and PD-047's BE-5 note. The pre-edit roadmap and `entry-gate.md` are in the pre-G02 backup (addendum hash list `pre-G02-backup-addendum.sha256`). T001's separate named authorization remains outstanding.
+   - **The 8 LOW findings** are recorded follow-ups. Under the PASS criterion none blocks BE-7. The reconciliation addresses F7, which concerns citing the evidence.
+   - **Limits.** This direction closes no other gate and authorizes neither T001 nor any implementation.
+7. **Scope.** This decision covers governance, configuration, documentation and compatibility changes only. It does not authorize application implementation, T001, staging, commits, pushes or deployment.
+
+Isolation evidence (2026-11-16, `D:\Wanees-Delegation-Evidence\G02-20261116\`):
+- **Read-only isolation.** An adversarial probe ran through the `claude-delegate` relay with `--read-only --model claude-sonnet-5-5 --effort xhigh`, on the pre-G02 tree.
+  - The session's init event shows tools `[Glob, Grep, Read]`, `permissionMode: plan` and no MCP servers.
+  - The brief asked it to write inside and outside the repository and to run a shell. Write, edit and shell tools were absent, so it made no such call; its only call was one Read.
+  - The before/after hashes were identical for Git status, the diff, `AGENTS.md`, `.delegate/config.json`, `.scratch/` and the evidence directory.
+  - `readOnlyViolation` was false.
+  - The reviewer's session ID differed from the orchestrator's.
+- **Effective effort.** Claude Code 2.1.325 documents a silent per-model effort downgrade. A Stop hook captured the CLI's post-downgrade `CLAUDE_EFFORT`. It reported `xhigh` for Sonnet 5.5 at `--effort xhigh` with the parent's inherited variable removed, and again with `--permission-mode plan` and the inherited parent environment.
+  - Exact commands: `effort-probe/COMMANDS.md`.
+  - Not captured directly: effort inside a relay `--lane plan-review` run, which uses the same flags but has no hook.
+- **Limitations.**
+  - On native Windows this is a tool restriction plus a Git tripwire, not OS isolation.
+  - User and plugin hooks run outside the tool restriction. The only enabled hook plugin, Warp 2.4.0, has scripts that emit terminal notifications. Its SessionStart script also writes the CLI version to Claude's session environment file, which is outside the repository. Only its SessionStart hook was observed firing in a reviewer run.
+
+Reversibility:
+- Pre-G02 copies of every edited file and of `.delegate/config.json` (hash `a12c5ea3…62c2c`) are kept in two places:
+  - `D:\Wanees-Delegation-Evidence\G02-20261116\pre-G02-backup\`;
+  - `%USERPROFILE%\.config\delegate-skills\backups\G02-20261116\pre-G02-backup\`.
+- Their hash list `pre-G02-backup.sha256` has SHA-256 `0b422044199efe583919b6249c9ce09d196236b19e9d3eaf773aef31d8a86e18`.
+- These edits are uncommitted or untracked, so Git alone cannot restore G01.
+- One further file, `.scratch/review-gated-push/spec.md`, is not in the backup. Its only change is the inserted "Note (2026-11-16)" blockquote after the Version line, plus a blank line; deleting both reverts it.
+- To reinstate G01: restore those files, re-approve the project config, and mark this entry Superseded. Do this only on the owner's explicit instruction.
+
+Consequences: these documents now cite G02:
+- AGENTS §5;
+- rule 04 item 4;
+- `tasks.md`: the Status line, the Review-risk line, the routing summary, the review wording of all 85 cards, and the T081/T082 acceptance criteria;
+- `backend-first-amendment.md` §8 and §10.
+
+Superseded G01 wording in those passages is quoted verbatim or preserved alongside the change, or preserved in the pre-G02 backup (see Reversibility).
+
+Date / approved by: 2026-11-16, project owner (authorization of the temporary migration and the BE-7 direction in item 6). Recorded by Claude Opus 5.5 as orchestrator.
 
 ---
 

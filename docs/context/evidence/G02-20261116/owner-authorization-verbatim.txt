@@ -1,0 +1,119 @@
+Source: Claude Code paste cache file ~/.claude/paste-cache/bbed55810c6ad6d0.txt (the owner's pasted G02 prompt in session 30d81533-413d-4bb3-a1f6-1146207bc5b4; mtime 2026-11-16T00:13:43Z). Copied byte-for-byte below this header by the orchestrator on 2026-11-16.
+
+# Wanees — Activate Claude-Led Governance & Hybrid Fleet
+
+**Execution model:** Claude Opus 5.5 — High Effort  
+**Repository:** `D:\Projects\loyalty-interchange-protocol-main`
+
+## Owner decision
+
+I authorize a temporary, reversible migration of the Wanees orchestration and review governance from Codex Sol to Claude Code.
+
+Claude Opus 5.5 is the Primary Orchestrator during this period.
+
+Codex Sol is unavailable and must not be invoked, retried, or treated as a blocking dependency.
+
+Remove the separate Final Verdict role from the active workflow while preserving independent reviews and explicit owner approval for protected actions.
+
+This authorization covers governance, configuration, documentation and compatibility changes necessary for the migration. It does **not** authorize arbitrary application implementation, committing, pushing or deployment.
+
+## Phase 1 — Inspect only relevant rules
+
+Inspect:
+
+- AGENTS.md §5
+- `.agents/rules/04-git-and-deployment-governance.md`
+- `.delegate/config.json`
+- Existing references to `plan-review`, `final-verdict`, `gpt-6.1-sol`, and mandatory reviewer routing
+- Current BE-7 requirements and T001 prerequisites
+
+Do not repeat G01 investigations, the inventory, W1 readiness or the Delegate Fleet setup.
+
+Identify the smallest set of conflicting active rules.
+
+## Phase 2 — Update the active governance
+
+Implement a consistent temporary Claude-led policy:
+
+1. Claude Opus 5.5 High is the Primary Orchestrator.
+2. Claude Sonnet 5.5 XHigh is the independent `plan-review` reviewer when Opus authored the plan.
+3. A reviewer must not independently approve their own work, even across separate sessions.
+4. Preserve independent HIGH/CRITICAL review requirements.
+5. Preserve explicit owner authorization for protected implementation tasks.
+6. Preserve owner approval for Git push and deployment.
+7. Remove the separate `final-verdict` gate and reconcile its references so no dangling dependencies remain.
+8. Preserve historical evidence and past review records verbatim.
+9. Keep the migration reversible so the canonical Sol configuration can be restored later if explicitly requested.
+
+Do not weaken security isolation requirements or treat a successful CLI call as proof of read-only isolation.
+
+## Phase 3 — Update the Delegate Fleet
+
+Apply the following routing changes:
+
+| Lane | Provider | Model | Effort |
+|---|---|---|---|
+| planning | claude | Opus 5.5 | High |
+| plan-review | claude | Sonnet 5.5 | XHigh |
+| review | claude | Sonnet 5.5 | High |
+| migration-review | claude | Opus 5.5 | High |
+| ui | claude | Sonnet 5.5 | High |
+| docs-review | claude | Sonnet 5.5 | Medium |
+
+Preserve the existing Hydrogen High and Flash implementation lanes.
+
+Preserve the remaining approved Hybrid mappings unless a change is necessary for consistency.
+
+Retire `final-verdict` from active dispatch and remove active references to it. If the delegate config cannot remove a lane without breaking dependencies, preserve its configuration entry as a compatibility stub but never dispatch it; document the limitation.
+
+Ensure no active required lane routes to Codex.
+
+## Phase 4 — Verify real review isolation
+
+Before accepting Sonnet as the mandatory independent plan reviewer:
+
+- Verify the Claude relay's actual read-only enforcement on Windows.
+- Verify that the review cannot modify the repository or approved evidence.
+- Confirm distinct author and reviewer sessions.
+- Validate the effective reviewer model and effort.
+- Do not silently downgrade effort.
+- If the required isolation cannot be established, report the exact technical limitation and retain the affected safety gate.
+
+Use the smallest practical verification, not the full historical test suite.
+
+## Phase 5 — Close BE-7 when eligible
+
+Once the new governance and reviewer requirements are verified:
+
+Dispatch one focused independent `plan-review` through Claude Sonnet 5.5 XHigh.
+
+Review only the existing BE-7 delta:
+
+- G01-19, G01-23 and G01-24.
+- T083–T085 prerequisite wording.
+- Post-adoption PD-047 and BE-5 documentation changes.
+
+Reuse the existing evidence.
+
+If the independent review passes, reconcile BE-7 documentation and close the gate according to the updated policy.
+
+If it fails, fix only the identified findings and obtain a fresh independent review.
+
+Do not automatically start T001.
+
+## Phase 6 — Report and continue
+
+Provide one concise report:
+
+1. Governance files changed.
+2. Effective 21-lane routing and retired lanes.
+3. Verification results.
+4. Whether BE-7 is closed.
+5. Remaining blockers for T001.
+6. Exact next executable development task.
+
+No staging, commits, pushes or deployments.
+
+Do not ask me to manually transfer prompts between agents. Coordinate the delegates yourself.
+
+Prioritize making Wanees development operational without Codex while preserving real independent review and owner-controlled deployment.

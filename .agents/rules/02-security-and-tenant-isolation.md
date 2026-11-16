@@ -30,3 +30,10 @@ description: Multi-tenant Postgres RLS isolation, EGP integer piasters, Egyptian
    - Store OTP codes as HMAC digests with a server-side secret and compare in constant time (`crypto.timingSafeEqual`).
    - Store session IDs hashed (`>= 256` bits entropy) with `httpOnly`, `Secure`, `SameSite` cookies and CSRF protection.
    - Verify webhooks on the raw body using HMAC-SHA256 + constant-time comparison and deduplicate by transaction/event ID.
+
+6. **Idempotency & Immutable Ledger (`04-business-rules.md`)**:
+   - Every write carries an idempotency key and a stable business ID (`order_id`, `redemption_id`, `adjustment_id`).
+   - The ledger is immutable: corrections and voids are new entries, never `UPDATE` or `DELETE`.
+
+7. **Billing (`PD-005 A1`)**:
+   - Billing at launch is manual (`billing_provider: "manual"`). Kashier is deferred, not removed. Do not add Stripe code paths.

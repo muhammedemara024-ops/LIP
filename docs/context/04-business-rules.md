@@ -365,7 +365,8 @@ Method A — customer scans branch QR (convenience path):
 - MUST: changing the phone number requires an OTP to the new number and
   revokes every session and device secret.
 - Defaults: 6-digit code, valid 5 min; resend cooldown 60 s; per phone ≤ 5
-  sends/hour, ≤ 10/day; ≤ 5 wrong attempts per code; session slides 90 days.
+  sends in any rolling 60 minutes, shared across WhatsApp, SMS and all OTP
+  purposes (PD-042), ≤ 10/day; ≤ 5 wrong attempts per code; session slides 90 days.
 - Channel: WhatsApp authentication template first; SMS fallback in Arabic,
   WebOTP-formatted (`@<domain> #<code>` last line), one 70-character segment.
 - OTP cost is a platform cost, never counted against a café's message allowance.
