@@ -3,7 +3,8 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    # FP-007 (PD-050): `deliver/**` lets `verify` run on the exact SHA before it is fast-forwarded to main.
+    branches: [main, "deliver/**"]
 
 permissions:
   contents: read

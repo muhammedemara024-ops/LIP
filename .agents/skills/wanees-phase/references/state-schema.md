@@ -8,6 +8,8 @@ File: `.scratch/wanees-phases/phase-<n>/state.json`. It is untracked. Write it a
   "phase": { "id": 2, "title": "Foundational …", "tasksSha256": "<sha256 of specs/002-p0-prd/tasks.md at start>" },
   "branch": "feat/wanees-phase-2",
   "stage": "selected | preflight | executing | verifying | reviewing | awaiting-owner | committed | pushed | pr-open | merged | blocked",
+  "delivery": "direct-main | pr",
+  "mainSha": "<sha on main after a direct push; for direct delivery, stage merged means pushed to main>",
   "baseline": {
     "head": "<sha>",
     "statusDigest": "<sha256 of git status --porcelain=v1 -uall>",

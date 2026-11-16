@@ -2375,6 +2375,8 @@ Date / approved by: 2026-11-16, project owner (authorization of the temporary mi
 
 ## PD-049 — Conditional auto-merge of eligible Wanees Phase PRs; GitHub AI review supplements G02 — Approved (2026-11-16)
 
+> **Partly superseded by PD-050 (2026-11-16):** item 8 (ruleset requires conversation resolution) and the PR-based routine delivery in item 1 no longer apply. The remaining items stay approved and dormant while `LIP_AUTOMERGE_ENABLED` is `false`.
+
 Context: the owner approved the target flow "Spec Kit Phase → Delegate Implementation → Phase Tests → Independent Code Review → Commit → Push → PR → GitHub CI + Claude AI Review → Conditional Auto-Merge to main". The automation is `.github/workflows/claude-pr-review.yml`, `.github/workflows/claude-auto-merge.yml` and `.github/scripts/` (`automerge-policy.mjs`, `claude-review-gate.mjs`, `gate-policy.test.mjs`). Independent G02 review rounds 1–3 ran under `.scratch/pr-automation-20261116/review/`; the owner authorized round 3 and one focused delta review after it.
 
 Decision:
@@ -2395,18 +2397,19 @@ Date / approved by: 2026-11-16, project owner. Recorded by Claude Opus 5.5 as or
 
 ## PD-050 — Direct-to-main delivery for Wanees development; PD-049 PR flow dormant — Approved (2026-11-16)
 
-Context: the owner directed on 2026-11-16: "I authorize normal commits and direct fast-forward pushes to main for completed, reviewed, authorized development tasks. Do not create new PRs for routine Phase delivery." The GitHub `main` ruleset "main protection (PD-049)" required a pull request, a `verify` check and a `Claude PR Review` check, and its Claude review was failing on the Anthropic API.
+Context: the owner directed on 2026-11-16 (full verbatim text: `docs/context/evidence/PD-050/owner-instruction-20261116.md`): "I authorize normal commits and direct fast-forward pushes to main for completed, reviewed, authorized development tasks. Do not create new PRs for routine Phase delivery." The GitHub `main` ruleset "main protection (PD-049)" required a pull request, a `verify` check and a `Claude PR Review` check; the Claude review had failed on PR #6 (run 43854802214, job 133256180630).
 
 Decision:
-1. **Direct delivery.** Routine delivery is a fast-forward push to `main` from a worktree or branch that contains the latest `origin/main`. No PR is created unless the owner asks for one.
-2. **Ruleset.** The `main` ruleset keeps `deletion` and `non_fast_forward` and has no bypass actor. Its `pull_request` and `required_status_checks` rules (including `verify` and `Claude PR Review`) are removed, because GitHub cannot accept a direct push to a branch that requires a PR or status checks. The `verify` CI workflow still runs on every push to `main`; its result is inspected after the push.
-3. **Gates preserved before each push.** Task authorization and closed gates; relevant tests and the standard verification; an independent review (AGENTS §5, G02) that passes on the exact content pushed; `main` fast-forwardable. CI moves from a pre-merge gate to a post-push check, so these local conditions are the gate.
-4. **PD-049 status.** The Claude PR review and auto-merge workflows stay in the repository, dormant for direct delivery. `LIP_AUTOMERGE_ENABLED` stays `false`; native auto-merge stays off. PD-049 items stay as history; nothing in it authorizes a PR for routine delivery any more.
+1. **Direct delivery.** Routine delivery is a fast-forward push to `main` of a commit that contains the latest `origin/main`. No PR is created unless the owner asks for one.
+2. **Ruleset.** The `main` ruleset keeps `deletion`, `non_fast_forward` and the required `verify` check (strict, up to date), and has no bypass actor. Its `pull_request` rule and the `Claude PR Review` required check are removed. GitHub accepts a push to a branch with required checks only when they already passed on that commit on another ref, so the delivery commit is first pushed to `deliver/<slug>`; CI runs there (FP-007, `.github/workflows/ci.yml`).
+3. **Gates before each push.** Task authorization and closed gates; relevant tests and standard verification run locally; an independent review (AGENTS §5, G02) that passes on the exact content pushed; a green `verify` on that exact SHA on the delivery branch; `main` fast-forwardable. A `deliver/*` branch is never deleted by an agent.
+4. **PD-049 status.** Superseded in part (its item 8 and the PR-based routine delivery in item 1). The Claude PR review and auto-merge workflows stay in the repository, dormant. `LIP_AUTOMERGE_ENABLED` stays `false`; native auto-merge stays off.
 5. **Not authorized.** Force pushes, branch deletion, deployment, application-secret changes, any task lacking its own authorization and any bypass actor.
+6. **Orchestrator note.** G02 names Claude Opus 5.5 High as orchestrator. This decision was recorded by an orchestrator session running Claude Sonnet 5.5, a deviation reported to the owner; independent review was by the Opus 5.5 High `migration-review` lane.
 
 Consequences: `AGENTS.md` §2 table row and §8, rule 04 item 5 and `.agents/skills/wanees-phase/SKILL.md` §7 are updated; `references/pr-template.md` is retained only for owner-requested PRs.
 
-Date / approved by: 2026-11-16, project owner. Recorded by Claude Sonnet 5.5 as orchestrator.
+Date / approved by: 2026-11-16, project owner.
 
 ---
 

@@ -12,6 +12,7 @@ Changes to `/lip/v1` wire semantics or `spec/` are never allowed and never appea
 | `skills/lip/SKILL.md`, `skills/lip-cli/SKILL.md`, `skills/lip-webhooks/SKILL.md`, `skills/lip-bff/SKILL.md`, `docs/api-docs-gap-analysis.md`, `docs/postgres.md`, `docs-site/guides/postgres.mdx` | Task 0.9 documentation drift fixes (v0.2.0 `/platform/v1` and `/admin/api/v1/program/*` scope, webhook loopback env var + 16-char secret + `balance.changed.v1`, PD-004 BFF OTP note, July 2026 historical banner, 3-service diskless Render blueprint) | PD-002, PD-004, PD-006 | Docs-only merge |
 | `package.json`, `package-lock.json`, `packages/mcp/package.json`, `packages/mcp/src/lib.ts`, `packages/mcp/src/server.ts`, `tests/unit/mcp.test.ts`, `apps/admin/package.json` | FP-002: Task 0.12 dependency security remediation eliminating 19 baseline vulnerable package nodes (46 unique advisory URLs) across Core SaaS, MCP tooling, and dev toolchain | PD-002, PD-004 | Reconcile root overrides and packages/mcp manifests on upstream merge |
 | `.github/workflows/ci.yml` | FP-006: one added step in job `verify` runs the Wanees PR-automation policy self-test (`node --test .github/scripts/gate-policy.test.mjs`) | PD-049 | Trivial merge; re-apply the step if upstream rewrites job `verify` |
+| `.github/workflows/ci.yml` | FP-007: `on.push.branches` gains `"deliver/**"` so `verify` runs on delivery branches | PD-050 | Trivial merge; re-apply if upstream rewrites the `on:` block |
 
 ---
 
@@ -167,3 +168,12 @@ npm audit
 - **Test coverage:** the step runs the policy test suite itself (Node built-in test runner, no dependencies). Local evidence: `.scratch/pr-automation-20261116/review/`.
 - **Rollback:** delete the step; nothing else depends on it.
 - **Upgrade impact:** trivial merge. Re-apply the step if upstream restructures job `verify`.
+
+### FP-007 (Approved 2026-11-16, PD-050): CI runs on delivery branches
+
+- **File modified:** `.github/workflows/ci.yml` (upstream). `on.push.branches` changes from `[main]` to `[main, "deliver/**"]`, plus a one-line comment. No other line changes.
+- **Reason:** direct-to-main delivery (PD-050) keeps the required `verify` check on the `main` ruleset. GitHub accepts a push to a branch with required status checks only when the checks already passed on that commit on another ref, so `verify` must run on the delivery branch first.
+- **Behaviour impact:** none on `/lip/v1`, `spec/`, packages or runtime. One extra CI run per delivery branch push.
+- **Test coverage:** exercised by the first delivery (the `deliver/phase-1` run of `verify`); a missing run blocks the push to `main`.
+- **Rollback:** restore `branches: [main]`; delivery would then need a PR or an owner ruleset change.
+- **Upgrade impact:** trivial merge.

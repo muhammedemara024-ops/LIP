@@ -188,7 +188,7 @@ check("direct-card: next is blocked", j.next.action === "blocked", j.next);
 j = run(mk({ status: auth(UI4.join(", ")), register: uiReg("Closed 2026-12-01 by owner record."), cards: uiCards }));
 check("direct-card: ui-entry dated Closed -> candidates", UI4.every((id) => j.tasks[id].status === "candidate"), UI4.map((id) => j.tasks[id].status));
 
-// ================= Copies of the real approved artifacts (sanitized: live authorization lines stripped) =================
+// ================= Copies of the real approved artifacts (sanitized: live authorization lines stripped and live T001/T002 ticks reset) =================
 // Each copy starts with NO recorded authorization, so these tests do not depend on today's Status line (review F5);
 // every authorization a test needs is added explicitly.
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../../..");

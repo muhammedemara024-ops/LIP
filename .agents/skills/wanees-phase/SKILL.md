@@ -177,7 +177,7 @@ Redo only what reality contradicts, and say why.
 **`baseline-not-in-git` blocker.** Raise it at branch time when a file the Phase must commit is untracked or modified before the Phase starts. Today this applies to `specs/002-p0-prd/`, including `tasks.md` and `quickstart.md`, and to the uncommitted governance edits. Committing those files in a Phase commit would carry non-Phase content.
 - Work may continue on the working tree.
 - Commit packaging (§7) stays blocked until the owner decides how the approved baseline lands.
-- Until then, `tasks.md` checkbox edits and any other edits to baseline files stay in the working tree only, and the PR lists them as "not committed".
+- Until then, `tasks.md` checkbox edits and any other edits to baseline files stay in the working tree only, and the delivery report (§9) lists them as "not committed".
 - Never fold them silently into a Phase commit.
 
 ## 4. Execute authorized tasks
@@ -287,11 +287,12 @@ Routine Phase delivery lands directly on `main` by fast-forward push. Do not ope
    - every task in the commit is authorized and its gates are closed (hard rule 1);
    - Phase verification (§5) passed in the delivery worktree, with exact counts and environment;
    - the independent review (§6) passed on exactly the content to be pushed (blobs equal);
+   - `verify` is green on that exact SHA on `origin/deliver/<slug>` (step 5);
    - `git fetch origin` done and the delivery branch contains `origin/main` (fast-forward possible).
    If any fails, STOP and do not push.
 3. **Deliver from a separate worktree** based on the latest `origin/main` when the local checkout is behind or dirty: `git worktree add -b "deliver/<slug>" "<path>" origin/main`, cherry-pick or commit the Phase files there, re-verify, re-confirm blobs.
 4. **Commit**, once per planned commit: `git add -- "<files>"`; check `git diff --cached --name-only` equals exactly those files (plus a pre-staged `.gitattributes` only in the primary checkout); `git commit -m "<msg>" -- "<files>"`; check `git show --stat HEAD` and each `git rev-parse HEAD:"<path>"` equals the reviewed blob id.
-5. **Push:** `git push origin "HEAD:main"` (fast-forward only). Never force, never `--force-with-lease`, never delete a branch on `origin`. If the push is rejected, `git fetch`, re-verify the changed base, and retry at most once; otherwise STOP.
+5. **Push (two steps, fast-forward only).** First `git push origin "HEAD:refs/heads/deliver/<slug>"` and wait for the `verify` run on that SHA (`gh run list --branch "deliver/<slug>"`); it must be green. Then `git push origin "<sha>:main"`, where `<sha>` is that same SHA. Never force, never `--force-with-lease`, never delete a branch on `origin`. If a push is rejected: `git fetch origin`; rebuild the delivery worktree from the new `origin/main` (§7.3, cherry-pick only); re-run every §7.2 pre-push condition in full (§5 verification, blob equality, a fresh `verify`; any reviewed file whose content or base context changed needs a §6 re-review); push again once; if rejected again, STOP.
 6. **After the push:** record the new `main` SHA in `state.json` (`stage: merged`, `delivery: "direct-main"`) and `log.md`; inspect the GitHub Actions run for that SHA and report its result.
 7. **Later tasks:** each new set of authorized tasks repeats §4–§7 with its own review.
 8. **Exception:** a PR is opened only if the owner explicitly asks for one for a specific change.
