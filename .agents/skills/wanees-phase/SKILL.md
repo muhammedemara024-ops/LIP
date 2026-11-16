@@ -15,7 +15,7 @@ description: Run one Wanees Spec Kit Phase end to end with the delegate fleet. I
 5. Independent Phase review.
 6. **Owner authorization.**
 7. Commit, push, open one PR.
-8. The owner merges.
+8. Merge (PD-049): an eligible Phase PR may merge through the Claude Auto-Merge Gate workflow; a sensitive one waits for the owner's merge.
 
 **Arguments:**
 - none or `status`: report only.
@@ -52,7 +52,7 @@ description: Run one Wanees Spec Kit Phase end to end with the delegate fleet. I
      - an earlier Phase's authorization;
      - anything you recorded yourself.
 4. **No destructive Git operations without explicit owner authorization.**
-   - Never merge.
+   - Never merge yourself. Only the owner or the Claude Auto-Merge Gate workflow (PD-049) merges a Phase PR.
    - Never run any of these:
      - `rebase`, `reset`, `stash`, `clean`;
      - `restore` or `checkout -- <path>`;
@@ -309,7 +309,7 @@ Build the change sets from the recorded patches. Each reviewer runs read-only in
 5. **PR.**
    - First check for an existing one: `gh pr list --repo muhammedemara024-ops/LIP --head "feat/wanees-phase-<n>" --state all`.
    - Only if none exists: `gh pr create --repo muhammedemara024-ops/LIP --base main --head "feat/wanees-phase-<n>" --title "<title>" --body-file "<file>"`.
-   - Record the URL and leave the PR open. **The owner merges.**
+   - Record the URL and leave the PR open. **You never merge.** The Claude Auto-Merge Gate workflow merges it only if it is eligible (PD-049); otherwise the owner merges.
 6. **Later tasks in the same Phase.**
    - Authorized while the PR is open: add them to the same branch and PR. They need the same verification, a re-review of the new content, and fresh owner commit and push authorization.
    - The PR has already merged: stop and ask the owner about a continuation branch, because the one-PR-per-Phase target cannot hold.

@@ -44,6 +44,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # Wanees PR-automation policy (review gate + merge decision). This runs the PR's
+      # copy, catching regressions; the merge workflow separately re-runs the trusted
+      # default-branch copy before any merge. No continue-on-error: a failure fails verify.
+      - name: PR automation policy tests
+        run: node --test .github/scripts/gate-policy.test.mjs
       - run: npm ci
       - run: npm run verify
       - run: npm run spec:check

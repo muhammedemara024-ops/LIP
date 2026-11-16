@@ -1,0 +1,174 @@
+name: Claude Auto-Merge Gate
+
+# Conditional automatic merge of eligible Wanees phase PRs. Inert until the repository
+# variable LIP_AUTOMERGE_ENABLED is exactly "true".
+#
+# Trust: both triggers below run THIS file and its scripts from the default branch
+# (workflow_run, pull_request_target), never from the PR. No job checks out, installs or
+# executes PR content; every PR-derived value is passed through env and parsed as data.
+#
+# Design (why not "arm native auto-merge early"): GitHub keeps a native auto-merge request
+# armed across later pushes by users with write access, and a later push that edits the
+# PR's own workflow files could produce trivially-passing checks under the same names. So:
+#   - `merge` runs only after a required workflow completes, re-reads everything live, and
+#     merges only the exact head SHA whose trusted checks passed (--match-head-commit).
+#     GitHub still enforces every branch rule at merge time; nothing is bypassed.
+#   - Recommended repository setting: "Allow auto-merge" OFF, so no native request can be
+#     armed at all. `disarm` is defence in depth: it cancels any native auto-merge request on
+#     a phase PR on every PR event.
+#   - Phase PRs that touch governance, security, schema, contract, build or deployment paths,
+#     or anything outside the allowlist, are never merged here (automerge-policy.mjs).
+on:
+  workflow_run:
+    workflows: ["CI", "Claude PR Review"]
+    types: [completed]
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited, ready_for_review, converted_to_draft, auto_merge_enabled]
+
+permissions: {}
+
+jobs:
+  disarm:
+    name: Disarm native auto-merge on phase PRs
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write       # required by the API to change a PR's auto-merge request
+      pull-requests: write
+    concurrency:
+      group: claude-auto-merge-disarm-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+      - name: Disable any armed native auto-merge (phase PRs merge only via the verified path)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$HEAD_REF" | grep -Eq '^feat/wanees-phase-[0-9]+$'; then
+            echo "Not a phase PR; nothing to disarm."; exit 0
+          fi
+          armed="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json autoMergeRequest --jq '.autoMergeRequest != null')"
+          if [ "$armed" = "true" ]; then
+            gh pr merge "$PR_NUMBER" --repo "$REPO" --disable-auto
+            echo "::warning title=Auto-merge disarmed::Native auto-merge was armed on phase PR #$PR_NUMBER and has been disabled; phase PRs merge only through the verified workflow_run path."
+          fi
+
+  merge:
+    name: Verify and merge eligible phase PR
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read         # workflow runs for the head SHA
+      checks: read          # check runs for the head SHA
+      contents: write       # merge (still subject to every branch rule)
+      pull-requests: write
+    concurrency:
+      group: claude-auto-merge-${{ github.event.workflow_run.head_sha }}
+      cancel-in-progress: false
+    steps:
+      - name: Kill switch
+        id: gate
+        env:
+          AUTOMERGE_ENABLED: ${{ vars.LIP_AUTOMERGE_ENABLED }}
+        run: |
+          if [ "$AUTOMERGE_ENABLED" = "true" ]; then echo "on=true" >> "$GITHUB_OUTPUT"
+          else echo "::notice title=Auto-merge off::LIP_AUTOMERGE_ENABLED is not 'true'; nothing merged."; echo "on=false" >> "$GITHUB_OUTPUT"; fi
+
+      # Default-branch checkout: trusted policy scripts only. PR code is never fetched.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        if: steps.gate.outputs.on == 'true'
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Self-test the trusted policy
+        if: steps.gate.outputs.on == 'true'
+        run: node --test .github/scripts/gate-policy.test.mjs
+
+      - name: Re-verify live state and merge the exact head SHA
+        if: steps.gate.outputs.on == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          AUTOMERGE_ENABLED: ${{ vars.LIP_AUTOMERGE_ENABLED }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_PRS: ${{ toJSON(github.event.workflow_run.pull_requests) }}
+        run: |
+          set -euo pipefail
+          # Candidate PRs from the event are hints only; everything is re-read live below.
+          mapfile -t PRS < <(printf '%s' "$RUN_PRS" | node -e '
+            let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{ let a; try { a=JSON.parse(s); } catch { a=[]; }
+              for (const p of Array.isArray(a)?a:[]) if (p && Number.isInteger(p.number) && p.base && p.base.ref==="main") console.log(p.number); });')
+          if [ "${#PRS[@]}" -ne 1 ]; then
+            echo "::notice title=Not merged::Expected exactly one PR into main for $EXPECTED_SHA, found ${#PRS[@]}."; exit 0
+          fi
+          PR_NUMBER="${PRS[0]}"
+
+          # All API data goes to files (env vars are capped at 128 KiB each on Linux).
+          D="$RUNNER_TEMP/automerge"; rm -rf "$D"; mkdir -p "$D"
+          export PR_FILE="$D/pr.json" FILES_FILE="$D/files.jsonl" RULES_FILE="$D/rules.jsonl" CHECK_RUNS_FILE="$D/checks.jsonl" \
+                 WORKFLOW_RUNS_FILE="$D/runs.jsonl" JOBS_FILE="$D/jobs.jsonl" REVIEWS_FILE="$D/reviews.jsonl"
+
+          # mergeable/mergeable_state are computed lazily and can lag the last check ("unknown",
+          # null, or a stale "blocked"); poll up to ~40 s for "clean", then let the policy decide.
+          for i in 1 2 3 4 5 6 7 8; do
+            gh api "repos/$REPO/pulls/$PR_NUMBER" > "$PR_FILE"
+            ms="$(node -e 'try{const p=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(p.mergeable===true&&p.mergeable_state==="clean"?"clean":"wait")}catch{console.log("wait")}' "$PR_FILE")"
+            [ "$ms" = "clean" ] && break
+            sleep 5
+          done
+
+          # Every API read must succeed; a failed read aborts the job (set -e + pipefail) => no merge.
+          # The patch is kept only for specs/<feature>/tasks.md (checkbox-only check).
+          gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" --jq '.[] | {filename, previous_filename, status, patch: (if (.filename | test("^specs/[^/]+/tasks\\.md$")) then .patch else null end)}' > "$FILES_FILE"
+          gh api --paginate "repos/$REPO/rules/branches/main?per_page=100" --jq '.[]' > "$RULES_FILE"
+          gh api --paginate "repos/$REPO/commits/$EXPECTED_SHA/check-runs?filter=all&per_page=100" --jq '.check_runs[] | {id, name, head_sha, status, conclusion, started_at, app: {id: .app.id}, check_suite: {id: .check_suite.id}}' > "$CHECK_RUNS_FILE"
+          gh api --paginate "repos/$REPO/actions/runs?head_sha=$EXPECTED_SHA&per_page=100" --jq '.workflow_runs[] | {id, run_attempt, path, event, head_sha, head_branch, head_repository: {full_name: .head_repository.full_name}, check_suite_id, pull_requests: [(.pull_requests // [])[] | {number, base: {ref: .base.ref}}]}' > "$WORKFLOW_RUNS_FILE"
+          gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/reviews?per_page=100" --jq '.[] | {state, user: {login: .user.login}}' > "$REVIEWS_FILE"
+
+          # Step-level evidence for EVERY attempt of every AI-review run on this SHA (re-runs
+          # included), so a failed review cannot be re-run into a pass. Capped; the policy
+          # denies when an attempt is missing or over the cap.
+          : > "$JOBS_FILE"
+          node -e '
+            const lines = require("fs").readFileSync(process.argv[1], "utf8").split("\n").filter(Boolean);
+            for (const l of lines) { const w = JSON.parse(l);
+              if (w.path === ".github/workflows/claude-pr-review.yml" && Number.isInteger(w.id) && Number.isInteger(w.run_attempt))
+                for (let n = 1; n <= Math.min(w.run_attempt, 20); n++) console.log(w.id + " " + n); }' "$WORKFLOW_RUNS_FILE" > "$D/attempts.txt"
+          while read -r run_id attempt; do
+            gh api --paginate "repos/$REPO/actions/runs/$run_id/attempts/$attempt/jobs?per_page=100" \
+              --jq '.jobs[] | {run_id, run_attempt, name, status, conclusion, steps: [(.steps // [])[] | {name, status, conclusion, started_at}]}' < /dev/null >> "$JOBS_FILE"
+          done < "$D/attempts.txt"
+
+          set +e
+          RESULT="$(node .github/scripts/automerge-policy.mjs)"
+          status=$?
+          set -e
+          echo "$RESULT"
+          if [ "$status" -eq 3 ]; then
+            echo "::notice title=Not merged::$RESULT"; exit 0
+          fi
+          if [ "$status" -ne 0 ]; then
+            echo "::error title=Auto-merge policy crashed::exit $status; nothing merged."; exit 1
+          fi
+
+          # Last re-read right before merging: still open, not draft, base main, same head.
+          FINAL="$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '[.state, (.draft|tostring), .base.ref, .head.sha] | join(" ")')"
+          if [ "$FINAL" != "open false main $EXPECTED_SHA" ]; then
+            echo "::notice title=Not merged::PR changed after verification ($FINAL)."; exit 0
+          fi
+
+          # Atomic SHA pin: GitHub rejects the merge if the head moved after verification,
+          # and enforces every branch rule itself. No --admin, no bypass.
+          gh pr merge "$PR_NUMBER" --repo "$REPO" --squash --match-head-commit "$EXPECTED_SHA"
+          echo "::notice title=Merged::Phase PR #$PR_NUMBER merged at verified head $EXPECTED_SHA."

@@ -30,7 +30,7 @@ Title: `feat(wanees): Phase <n> — <Phase title> (<Txxx, …>)`
 ## Known limitations and open owner decisions
 <…>
 
-The owner merges. Do not auto-merge.
+Merge (PD-049): an eligible Phase PR merges only through the Claude Auto-Merge Gate workflow; any other PR waits for the owner's merge. No agent merges.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
