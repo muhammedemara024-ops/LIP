@@ -211,7 +211,7 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
     // newest first
     const times = seen.map((entry) => Date.parse(entry.occurred_at));
     expect([...times].sort((x, y) => y - x)).toEqual(times);
-    // every entry of the below-minimum order has amount 0 and carries the order id
+    // the below-minimum order is recorded with its order id; its points entry has amount 0
     const below = seen.filter((entry) => entry.order_id === `below-${member}`);
     expect(below.length).toBeGreaterThan(0);
     // The points entry exists with amount 0 (the credit-cents entry is a separate wallet-credit accrual).
@@ -260,13 +260,14 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
       });
       if (response.status === 500) throw Object.assign(new Error("retry"), { status: 500 });
       expect(response.ok).toBe(true);
+      expect(((await response.json()) as { location?: { active?: boolean }; active?: boolean }).location?.active ?? false).toBe(false);
     });
     // Observed against pinned LIP: the accrual is ACCEPTED (no refusal). PD-026 therefore needs a BFF-side check; recorded for the owner.
     const outcome = await retry500(() => client().accruals.post({ member_id: member, order: order(member, `dead-${member}`, 1000, "paid", dead) }, { idempotencyKey: `accrue:dead-${member}` }));
     expect(outcome.entry.location_id).toBe(dead);
   });
 
-  it("fixes the hold cost at reserve time and restores the reserved amount exactly once on expiry (PD-025; R-16)", async () => {
+  it("holds the cost quoted at reserve time (the republish case is not yet tested) and restores the reserved amount exactly once on expiry (PD-025; R-16)", async () => {
     const member = await freshMember();
     await accrue(member, `cost-${member}`, 5000);
     const before = await balances(member);
@@ -290,7 +291,9 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
     const after = await balances(member);
     expect(after["credits"]!.reserved).toBe(0);
     expect(after["credits"]!.amount).toBe(before["credits"]!.amount);
-    // A replay of the reserve with the same key is not served from a cached success.
+    // LipClient builds a fresh request_id and occurred_at on every call, so ANY same-key replay through it is
+    // an idempotency_conflict whatever is cached. A re-send can only receive a cached result if it reuses the
+    // identical request body including its context (input to R-07 and FR-069).
     const replay = await refusal(() => reserve(member, `r-exp-${member}`, "one-dollar-off", `ro-exp-${member}`, 1000));
     expect(replay).toEqual({ status: 409, code: "idempotency_conflict" });
   });

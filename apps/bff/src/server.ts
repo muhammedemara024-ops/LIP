@@ -35,7 +35,9 @@ function errorBody(c: Context<Env>, code: string, details: Record<string, unknow
 }
 
 function rawHost(c: Context<Env>): string {
-  return (c.req.header("host") ?? "").toLowerCase();
+  // Lowercase, drop a trailing dot and a default or explicit port so `app.example.test:443` and
+  // `app.example.test.` are the public host, never mistaken for the private hop.
+  return (c.req.header("host") ?? "").toLowerCase().replace(/:\d+$/u, "").replace(/\.$/u, "");
 }
 
 /**

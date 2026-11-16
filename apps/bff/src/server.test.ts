@@ -192,6 +192,12 @@ describe("audience binding with probe routes (a request that gets through must b
     expect((await reached("GET", "/api/v1/customer/__probe", { host: "api.example.test", "x-forwarded-host": "app.example.test" })).status).toBe(404);
   });
 
+  it("treats Host variants of a public host (port, trailing dot) as that public host, not the private hop", async () => {
+    for (const host of ["app.example.test:443", "app.example.test."]) {
+      expect((await reached("POST", "/api/v1/owner/__probe", { host, "x-forwarded-host": "dashboard.example.test", origin: "https://dashboard.example.test" })).status).toBe(404);
+    }
+  });
+
   it("never lets X-Forwarded-Host select the operator mount, even from a private host", async () => {
     expect((await reached("GET", "/operator/v1/__probe", { host: "bff.internal", "x-forwarded-host": "api.example.test" })).status).toBe(404);
   });
