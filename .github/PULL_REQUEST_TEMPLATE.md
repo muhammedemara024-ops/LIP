@@ -19,3 +19,5 @@
 
 - [ ] `npm run verify`
 - [ ] Relevant desktop and 390px mobile render checked for visible changes.
+
+<!-- PD-049 smoke test (phase 98): protected-path change; must never auto-merge. -->
