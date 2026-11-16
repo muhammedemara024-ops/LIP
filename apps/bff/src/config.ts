@@ -10,7 +10,7 @@ import { assertSessionLeaseCompatibleUrl } from "@loyalty-interchange/storage-po
  */
 export interface BffConfig {
   readonly port: number;
-  /** Surface hosts, `host[:port]`, lower-case. The BFF serves each audience only on its own host. */
+  /** Surface hosts, bare lower-case host names (no port, no trailing dot: the audience check compares them with the request `Host` after the port is stripped). The BFF serves each audience only on its own host. */
   readonly hosts: {
     readonly customer: string;
     readonly staff: string;
@@ -49,7 +49,13 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): B
     return value;
   };
 
-  const hosts = REQUIRED_HOSTS.map((name) => read(name).toLowerCase());
+  const hosts = REQUIRED_HOSTS.map((name) => {
+    const host = read(name).toLowerCase();
+    if (host !== "" && !/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/u.test(host)) {
+      issues.push(`${name} must be a bare host name (no port, scheme, path or trailing dot)`);
+    }
+    return host;
+  });
   const urls = DATABASE_URLS.map((name) => {
     const value = read(name);
     if (value !== "") {

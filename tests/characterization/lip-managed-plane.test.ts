@@ -260,7 +260,7 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
       });
       if (response.status === 500) throw Object.assign(new Error("retry"), { status: 500 });
       expect(response.ok).toBe(true);
-      expect(((await response.json()) as { location?: { active?: boolean }; active?: boolean }).location?.active ?? false).toBe(false);
+      expect(await response.json()).toMatchObject({ location_id: dead, active: false });
     });
     // Observed against pinned LIP: the accrual is ACCEPTED (no refusal). PD-026 therefore needs a BFF-side check; recorded for the owner.
     const outcome = await retry500(() => client().accruals.post({ member_id: member, order: order(member, `dead-${member}`, 1000, "paid", dead) }, { idempotencyKey: `accrue:dead-${member}` }));

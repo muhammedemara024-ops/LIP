@@ -60,6 +60,14 @@ describe("loadConfig", () => {
     );
   });
 
+  it("refuses a surface host written with a port, scheme, path or trailing dot, naming only the variable", () => {
+    for (const bad of ["app.example.test:8443", "https://app.example.test", "app.example.test/x", "app.example.test."]) {
+      const issues = issuesFor({ ...GOOD, BFF_HOST_CUSTOMER: bad });
+      expect(issues.some((issue) => issue.includes("BFF_HOST_CUSTOMER"))).toBe(true);
+      expect(issues.join(" ")).not.toContain(bad);
+    }
+  });
+
   it("refuses duplicate surface hosts and an invalid port", () => {
     expect(issuesFor({ ...GOOD, BFF_HOST_STAFF: "app.example.test" }).join(" ")).toContain("must be distinct");
     expect(issuesFor({ ...GOOD, BFF_PORT: "70000" }).join(" ")).toContain("BFF_PORT");
