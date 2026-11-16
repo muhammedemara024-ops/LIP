@@ -11,6 +11,7 @@ Changes to `/lip/v1` wire semantics or `spec/` are never allowed and never appea
 | `tests/unit/postgres-storage.test.ts`, `apps/cloud/src/migrate.test.ts` | Regression tests proving 8-way concurrent cold-start migration safety on a fresh PostgreSQL schema | PD-002 | Keep alongside migration lock fix |
 | `skills/lip/SKILL.md`, `skills/lip-cli/SKILL.md`, `skills/lip-webhooks/SKILL.md`, `skills/lip-bff/SKILL.md`, `docs/api-docs-gap-analysis.md`, `docs/postgres.md`, `docs-site/guides/postgres.mdx` | Task 0.9 documentation drift fixes (v0.2.0 `/platform/v1` and `/admin/api/v1/program/*` scope, webhook loopback env var + 16-char secret + `balance.changed.v1`, PD-004 BFF OTP note, July 2026 historical banner, 3-service diskless Render blueprint) | PD-002, PD-004, PD-006 | Docs-only merge |
 | `package.json`, `package-lock.json`, `packages/mcp/package.json`, `packages/mcp/src/lib.ts`, `packages/mcp/src/server.ts`, `tests/unit/mcp.test.ts`, `apps/admin/package.json` | FP-002: Task 0.12 dependency security remediation eliminating 19 baseline vulnerable package nodes (46 unique advisory URLs) across Core SaaS, MCP tooling, and dev toolchain | PD-002, PD-004 | Reconcile root overrides and packages/mcp manifests on upstream merge |
+| `.github/workflows/ci.yml` | FP-006: one added step in job `verify` runs the Wanees PR-automation policy self-test (`node --test .github/scripts/gate-policy.test.mjs`) | PD-049 | Trivial merge; re-apply the step if upstream rewrites job `verify` |
 
 ---
 
@@ -155,3 +156,14 @@ npm audit
 - **V7 (item 7).** Reconciliation against the planned amount: expiry between planning and execution, a crash before the first execution followed by a replay after a later expiry, a crash after the engine committed, tied `occurred_at` timestamps, and an immutable first-execution amount on every replay.
 
 **Upgrade impact.** Touches upstream `adjustOrder`. Every upstream sync must re-apply and re-verify it against the tests above. It is a candidate upstream contribution, since it aligns earn-rate handling with the existing multiplier rule in `spec/account-experience.md`.
+
+### FP-006 (Approved 2026-11-16, PD-049): PR-automation policy self-test in upstream CI
+
+- **File modified:** `.github/workflows/ci.yml` (upstream). One step added to job `verify`, after `actions/setup-node` and before `npm ci`: `name: PR automation policy tests`, `run: node --test .github/scripts/gate-policy.test.mjs`, with no `continue-on-error`, preceded by a three-line comment. No other line changes.
+- **Numbering:** FP-004 and FP-005 are reserved by `specs/002-p0-prd/` for the OD-09 and OD-15 candidate patches (`research.md`, `plan.md`, `tasks.md`), which stay unauthorized; this entry therefore takes FP-006.
+- **Reason:** the Claude PR Review and Claude Auto-Merge Gate workflows (PD-049) depend on `.github/scripts/automerge-policy.mjs` and `claude-review-gate.mjs`. Running their tests in `verify` makes a policy regression fail the required `verify` check. The merge workflow separately re-runs the trusted default-branch copy before any merge.
+- **Not an upstream code change:** `.github/scripts/` and the two Claude workflows are new SaaS-side files, not upstream patches (constitution Article II.4). Only the `ci.yml` edit is logged here.
+- **Behaviour impact:** none on `/lip/v1`, `spec/`, packages or runtime. `verify` gains about 2 s and one more way to fail.
+- **Test coverage:** the step runs the policy test suite itself (Node built-in test runner, no dependencies). Local evidence: `.scratch/pr-automation-20261116/review/`.
+- **Rollback:** delete the step; nothing else depends on it.
+- **Upgrade impact:** trivial merge. Re-apply the step if upstream restructures job `verify`.

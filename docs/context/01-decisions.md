@@ -2373,6 +2373,28 @@ Date / approved by: 2026-11-16, project owner (authorization of the temporary mi
 
 ---
 
+## PD-049 — Conditional auto-merge of eligible Wanees Phase PRs; GitHub AI review supplements G02 — Approved (2026-11-16)
+
+Context: the owner approved the target flow "Spec Kit Phase → Delegate Implementation → Phase Tests → Independent Code Review → Commit → Push → PR → GitHub CI + Claude AI Review → Conditional Auto-Merge to main". The automation is `.github/workflows/claude-pr-review.yml`, `.github/workflows/claude-auto-merge.yml` and `.github/scripts/` (`automerge-policy.mjs`, `claude-review-gate.mjs`, `gate-policy.test.mjs`). Independent G02 review rounds 1–3 ran under `.scratch/pr-automation-20261116/review/`; the owner authorized round 3 and one focused delta review after it.
+
+Decision:
+1. **Conditional auto-merge.** This decision, together with the owner setting `LIP_AUTOMERGE_ENABLED` to `true` (item 10), is the owner's standing explicit authorization (constitution Article X.4, AGENTS §8, rule 04 item 5) for the Claude Auto-Merge Gate workflow to create the squash-merge commit on `main` for a PR that passes every policy check. It authorizes nothing else: commits, pushes and PRs by agents still need the owner's explicit authorization, and the pre-PR independent G02 review (AGENTS §5, PD-048) is still required for HIGH/CRITICAL work; a green gate never replaces it. A Phase PR (`feat/wanees-phase-<N>`) into `main` may be merged by the Claude Auto-Merge Gate workflow only when every policy check in `automerge-policy.mjs` passes on the exact head SHA. Every other PR, and every sensitive Phase PR (governance, security, auth, tenant isolation, schema, migration, contract, ledger, build, deployment, or anything outside the allowlist), requires a human merge by the owner. No agent merges.
+2. **Review layering.** The GitHub Sonnet review supplements, and never replaces, the independent G02 review (PD-048, AGENTS §5).
+3. **Native auto-merge stays OFF.** "Allow auto-merge" stays disabled in repository settings. The workflow never arms native auto-merge, and its `disarm` job cancels any armed request on a Phase PR.
+4. **Security findings.** A security-category finding at any severity blocks auto-merge.
+5. **Fail-closed cancellation (R3-1).** A review attempt whose review step started, including a force-cancelled step with a null or missing conclusion, and whose gate did not succeed, counts as a failed review for that SHA.
+6. **No application code auto-merges (R3-2).** `apps/bff` is excluded (owner decision, round 2). Implementation detail reviewed under G02 (not an owner-listed item): in `apps/web` only non-executable files (stylesheets, images, fonts, locale message JSON) and new test files outside Next.js routing directories are eligible. Next.js server-side or uncertain code always needs a human merge.
+7. **Tests** (implementation detail fixing review finding F1, reviewed under G02; not one of the owner's listed decisions). Only added test files are eligible; modifying, renaming or removing an existing test needs a human merge.
+8. **Branch ruleset.** The `main` ruleset requires conversation resolution.
+9. **Fork patch.** The added self-test step in upstream `.github/workflows/ci.yml` is recorded as FP-006 in `docs/context/07-fork-patches.md` (FP-004 and FP-005 stay reserved for the unauthorized OD-09 and OD-15 candidates).
+10. **Activation** (implementation detail reviewed under G02; the owner sets the variable). The workflow stays inert until the owner sets repository variable `LIP_AUTOMERGE_ENABLED` to `true` after completing `.scratch/pr-automation-20261116/ACTIVATION.md`.
+
+Consequences: `.agents/skills/wanees-phase/SKILL.md` no longer states that the owner merges every Phase PR; eligible Phase PRs may merge through the gate workflow, sensitive ones wait for the owner. Owner authorization for commits, pushes, PRs, deployment, T001 and every Tier 2/Tier 3 gate is unchanged. This decision does not itself change any GitHub setting or enable the workflow.
+
+Date / approved by: 2026-11-16, project owner. Recorded by Claude Opus 5.5 as orchestrator.
+
+---
+
 Template for new entries:
 
 ```
