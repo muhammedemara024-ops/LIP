@@ -1,0 +1,43 @@
+# Disposable, never merged. Sanitized Anthropic API connectivity probe.
+# Prints only HTTP status codes, a whitelisted error.type, and booleans.
+name: diag-anthropic-api
+on:
+  push:
+    branches: [diag/anthropic-api]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe (sanitized output only)
+        shell: bash
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set +x
+          umask 077
+          t="$(mktemp -d)"
+          k="${ANTHROPIC_API_KEY:-}"
+          b() { if "$@"; then echo true; else echo false; fi; }
+          echo "key_present=$(b test -n "$k")"
+          echo "key_has_whitespace=$(b grep -q '[[:space:]]' <<<"$k")"
+          echo "key_prefix_api=$(case "$k" in sk-ant-api*) echo true;; *) echo false;; esac)"
+          echo "key_prefix_oauth=$(case "$k" in sk-ant-oat*) echo true;; *) echo false;; esac)"
+          printf 'x-api-key: %s\nanthropic-version: 2023-06-01\ncontent-type: application/json\n' "$k" > "$t/h"
+          unset k ANTHROPIC_API_KEY
+          et() { jq -r '.error.type // "none"' "$1" 2>/dev/null | tr -cd 'a-z_' | head -c 40; echo; }
+          cl() { b grep -qi 'credit balance' <(jq -r '.error.message // ""' "$1" 2>/dev/null); }
+          m=$(curl -sS -o "$t/m.json" -w '%{http_code}' --max-time 60 -H @"$t/h" \
+            -d '{"model":"claude-sonnet-5-5","max_tokens":16,"messages":[{"role":"user","content":"ping"}]}' \
+            https://api.anthropic.com/v1/messages 2>/dev/null)
+          echo "messages_http=$m"
+          echo "messages_error_type=$(et "$t/m.json")"
+          echo "messages_credit_balance_low=$(cl "$t/m.json")"
+          echo "messages_model=$(jq -r '.model // "none"' "$t/m.json" 2>/dev/null | tr -cd 'a-z0-9-' | head -c 40)"
+          g=$(curl -sS -o "$t/g.json" -w '%{http_code}' --max-time 60 -H @"$t/h" \
+            https://api.anthropic.com/v1/models/claude-sonnet-5-5 2>/dev/null)
+          echo "models_get_http=$g"
+          echo "models_get_error_type=$(et "$t/g.json")"
+          rm -rf "$t"
