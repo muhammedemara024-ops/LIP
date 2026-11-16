@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { randomUUID } from "node:crypto";
 import { LipClient } from "@loyalty-interchange/sdk";
+import type { ProgramDefinition } from "@loyalty-interchange/reference";
 import { createDemoProgram } from "@loyalty-interchange/server";
 import { ManagedPostgresDataPlaneManager } from "../../../cloud/src/managed-data-plane.js";
 import type { CloudEnvironment } from "../../../cloud/src/types.js";
@@ -77,7 +78,14 @@ async function admin(
  * Starts the plane and provisions two cafes (two tenants, two environments) on one database.
  * Each cafe publishes the demo points program under its own program id.
  */
-export async function startManagedPlane(connectionString: string, nowIso = "2026-01-01T00:00:00.000Z"): Promise<ManagedPlane> {
+export interface ManagedPlaneOptions {
+  /** Builds the program published for a cafe. Defaults to the demo points program. Keep currency USD and a points primary account (the managed bootstrap program fixes both). */
+  readonly program?: (programId: string) => ProgramDefinition;
+  readonly nowIso?: string;
+}
+
+export async function startManagedPlane(connectionString: string, options: ManagedPlaneOptions = {}): Promise<ManagedPlane> {
+  const nowIso = options.nowIso ?? "2026-01-01T00:00:00.000Z";
   const suffix = randomUUID().slice(0, 8);
   const environments = [
     ["cafe-a", environmentRecord(suffix, "a", nowIso)],
@@ -110,7 +118,7 @@ export async function startManagedPlane(connectionString: string, nowIso = "2026
     for (const [key, environment] of environments) {
       const credential = await manager.issueMerchantCredential(environment.environment_id, { subject: "fixture" });
       const lipBaseUrl = credential.api_url;
-      const program = { ...createDemoProgram(), program_id: environment.program_id };
+      const program = options.program !== undefined ? options.program(environment.program_id) : { ...createDemoProgram(), program_id: environment.program_id };
       const draft = await admin(lipBaseUrl, credential.merchant_api_key, "PUT", "/admin/api/v1/program/draft", { program });
       const version = (draft["draft"] as { version: number }).version;
       await admin(lipBaseUrl, credential.merchant_api_key, "POST", "/admin/api/v1/program/publish", { expected_draft_version: version });

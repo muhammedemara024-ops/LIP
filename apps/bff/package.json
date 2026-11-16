@@ -20,6 +20,8 @@
     "pg": "^8.22.0"
   },
   "devDependencies": {
+    "@loyalty-interchange/reference": "0.2.0",
+    "@loyalty-interchange/server": "0.2.0",
     "@types/pg": "^8.20.0"
   }
 }

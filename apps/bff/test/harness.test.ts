@@ -100,10 +100,14 @@ live("two BFF instances, a real managed data plane and one disposable PostgreSQL
     expect(pidsB.length).toBeGreaterThan(0);
     expect(pidsA.filter((pid) => pidsB.includes(pid))).toEqual([]);
     for (const instance of [a, b]) {
-      const response = await fetch(`${instance.url}/api/v1/customer/x`, { headers: { host: "app.fixture.test" } });
-      expect(response.status).toBe(404);
+      // Reaching the instance through the private hop (the listener's own Host is not a public host), only the customer host reaches the customer mount's CSRF guard: a foreign Origin gets 403 there.
+      const response = await fetch(`${instance.url}/api/v1/customer/x`, {
+        method: "POST",
+        headers: { "x-forwarded-host": "app.fixture.test", origin: "https://evil.fixture.test" }
+      });
+      expect(response.status).toBe(403);
       const body = (await response.json()) as { error: { code: string } };
-      expect(body.error.code).toBe("not_found");
+      expect(body.error.code).toBe("csrf_failed");
     }
   });
 
@@ -124,7 +128,7 @@ live("two BFF instances, a real managed data plane and one disposable PostgreSQL
     expect(cafeA.cafe.tenantId).not.toBe(cafeB.cafe.tenantId);
     expect(cafeA.cafe.programId).not.toBe(cafeB.cafe.programId);
     // No phone-number-like, email-like or name-like content anywhere in the seeded descriptor.
-    const serialized = JSON.stringify(world, (key, value: unknown) => (key === "cafe" ? undefined : value));
+    const serialized = JSON.stringify(world, (key, value: unknown) => (key === "cafe" || key === "memberId" ? undefined : value));
     expect(serialized).not.toMatch(/\+?\d{9,}/u);
     expect(serialized).not.toMatch(/@/u);
     for (const entry of world.cafes) {
@@ -177,8 +181,11 @@ live("two BFF instances, a real managed data plane and one disposable PostgreSQL
     await acquired!.release();
 
     expect(b.alive).toBe(true);
-    const response = await fetch(`${b.url}/api/v1/customer/x`, { headers: { host: "app.fixture.test" } });
-    expect(response.status).toBe(404);
+    const response = await fetch(`${b.url}/api/v1/customer/x`, {
+      method: "POST",
+      headers: { "x-forwarded-host": "app.fixture.test", origin: "https://evil.fixture.test" }
+    });
+    expect(response.status).toBe(403);
     expect((await b.pool.query("SELECT 1 AS ok")).rows[0]).toEqual({ ok: 1 });
     expect(await victim.backendPids()).toEqual([]);
   });

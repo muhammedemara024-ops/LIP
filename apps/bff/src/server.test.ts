@@ -146,3 +146,66 @@ describe("BFF HTTP skeleton", () => {
     expect(logged).toContain(body.error.request_id);
   });
 });
+
+describe("audience binding with probe routes (a request that gets through must be observable)", () => {
+  function probed() {
+    const app = createApp(config);
+    for (const mount of ["/api/v1/customer", "/api/v1/staff", "/api/v1/owner", "/operator/v1"]) {
+      app.get(`${mount}/__probe`, (c) => c.json({ reached: mount }));
+      app.post(`${mount}/__probe`, (c) => c.json({ reached: mount }));
+    }
+    return app;
+  }
+  const reached = async (
+    method: string,
+    path: string,
+    headers: Record<string, string>
+  ): Promise<{ status: number; reached?: string }> => {
+    const response = await probed().request(`http://bff.internal${path}`, { method, headers });
+    const body = (await response.json()) as { reached?: string };
+    return { status: response.status, ...(body.reached === undefined ? {} : { reached: body.reached }) };
+  };
+
+  it("reaches each mount only on its own host", async () => {
+    expect(await reached("GET", "/api/v1/customer/__probe", { host: "app.example.test" })).toEqual({ status: 200, reached: "/api/v1/customer" });
+    expect(await reached("GET", "/api/v1/staff/__probe", { host: "staff.example.test" })).toEqual({ status: 200, reached: "/api/v1/staff" });
+    expect(await reached("GET", "/api/v1/owner/__probe", { host: "dashboard.example.test" })).toEqual({ status: 200, reached: "/api/v1/owner" });
+    expect(await reached("GET", "/operator/v1/__probe", { host: "api.example.test" })).toEqual({ status: 200, reached: "/operator/v1" });
+  });
+
+  it("answers 404 to every foreign host on every mount", async () => {
+    const hosts = { customer: "app.example.test", staff: "staff.example.test", owner: "dashboard.example.test", operator: "api.example.test" } as const;
+    const mounts = { customer: "/api/v1/customer", staff: "/api/v1/staff", owner: "/api/v1/owner", operator: "/operator/v1" } as const;
+    for (const [audience, mount] of Object.entries(mounts) as [keyof typeof mounts, string][]) {
+      for (const [other, host] of Object.entries(hosts)) {
+        if (other === audience) continue;
+        const result = await reached("GET", `${mount}/__probe`, { host });
+        expect(result.status, `${other} host on ${audience} mount`).toBe(404);
+      }
+    }
+  });
+
+  it("ignores a client-supplied X-Forwarded-Host on a public host", async () => {
+    // Host app + XFH api must NOT reach the operator mount, and Host api + XFH app must not reach the customer mount.
+    expect((await reached("GET", "/operator/v1/__probe", { host: "app.example.test", "x-forwarded-host": "api.example.test" })).status).toBe(404);
+    expect((await reached("POST", "/operator/v1/__probe", { host: "staff.example.test", "x-forwarded-host": "api.example.test" })).status).toBe(404);
+    expect((await reached("GET", "/api/v1/customer/__probe", { host: "api.example.test", "x-forwarded-host": "app.example.test" })).status).toBe(404);
+  });
+
+  it("never lets X-Forwarded-Host select the operator mount, even from a private host", async () => {
+    expect((await reached("GET", "/operator/v1/__probe", { host: "bff.internal", "x-forwarded-host": "api.example.test" })).status).toBe(404);
+  });
+
+  it("honours X-Forwarded-Host for a browser surface only from a private host, using the last value", async () => {
+    const via = { host: "bff.internal", origin: "https://app.example.test" };
+    expect(await reached("POST", "/api/v1/customer/__probe", { ...via, "x-forwarded-host": "app.example.test" })).toEqual({ status: 200, reached: "/api/v1/customer" });
+    expect(await reached("POST", "/api/v1/customer/__probe", { ...via, "x-forwarded-host": "api.example.test, app.example.test" })).toEqual({ status: 200, reached: "/api/v1/customer" });
+    expect((await reached("POST", "/api/v1/customer/__probe", { ...via, "x-forwarded-host": "app.example.test, api.example.test" })).status).toBe(404);
+  });
+
+  it("refuses a state-changing browser request without a matching Origin or same-origin fetch metadata", async () => {
+    expect((await reached("POST", "/api/v1/customer/__probe", { host: "app.example.test", origin: "https://evil.example.test" })).status).toBe(403);
+    expect((await reached("POST", "/api/v1/customer/__probe", { host: "app.example.test" })).status).toBe(403);
+    expect((await reached("POST", "/api/v1/customer/__probe", { host: "app.example.test", "sec-fetch-site": "same-origin" })).status).toBe(200);
+  });
+});

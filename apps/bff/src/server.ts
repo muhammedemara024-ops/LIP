@@ -8,10 +8,10 @@ import { loadConfig, type BffConfig } from "./config.js";
  * authentication" and "Error model"). Registers the four audience mounts with NO
  * business handlers; later tasks add routes under these mounts.
  *
- * Audience is bound to the surface host. Browser surfaces reach the BFF through the
- * private Next.js hop (R-05), which forwards the original host in `X-Forwarded-Host`;
- * the BFF is reachable only on that private network, so the header is read first and
- * `Host` is the fallback. A mount requested on another audience's host is
+ * Audience is bound to the surface host. The operator mount is selected by `Host` only. Browser
+ * surfaces reach the BFF through the private Next.js hop (R-05), which forwards the original host
+ * in `X-Forwarded-Host`; that header is honoured only when `Host` is not itself a public audience
+ * host, and never for the operator mount. A mount requested on another audience's host is
  * indistinguishable from a missing route (`404 not_found`).
  */
 export type Audience = "customer" | "staff" | "owner" | "operator";
@@ -34,9 +34,21 @@ function errorBody(c: Context<Env>, code: string, details: Record<string, unknow
   };
 }
 
-function effectiveHost(c: Context<Env>): string {
-  const forwarded = c.req.header("x-forwarded-host")?.split(",")[0]?.trim();
-  return (forwarded !== undefined && forwarded !== "" ? forwarded : (c.req.header("host") ?? "")).toLowerCase();
+function rawHost(c: Context<Env>): string {
+  return (c.req.header("host") ?? "").toLowerCase();
+}
+
+/**
+ * Browser-surface audience host. A request that arrives directly on a public audience host is
+ * judged by `Host` alone: a client-supplied `X-Forwarded-Host` is ignored. Only a request whose
+ * `Host` is none of the public audience hosts (the private Next.js hop, R-05) may name the surface
+ * through `X-Forwarded-Host`, and then the LAST value is used (the one the nearest proxy set).
+ */
+function browserHost(c: Context<Env>, publicHosts: ReadonlySet<string>): string {
+  const host = rawHost(c);
+  if (publicHosts.has(host)) return host;
+  const forwarded = c.req.header("x-forwarded-host")?.split(",").at(-1)?.trim().toLowerCase();
+  return forwarded !== undefined && forwarded !== "" ? forwarded : host;
 }
 
 function originMatches(c: Context<Env>, surfaceHost: string): boolean {
@@ -66,10 +78,13 @@ export function createApp(config: BffConfig): Hono<Env> {
     operator: config.hosts.api
   };
 
+  const publicHosts: ReadonlySet<string> = new Set(Object.values(audienceHost));
+
   for (const audience of Object.keys(MOUNTS) as Audience[]) {
     const mount = MOUNTS[audience];
     app.use(`${mount}/*`, async (c, next) => {
-      const host = effectiveHost(c);
+      // The operator audience is decided by `Host` only; `X-Forwarded-Host` never selects it.
+      const host = audience === "operator" ? rawHost(c) : browserHost(c, publicHosts);
       if (host !== audienceHost[audience]) {
         return c.json(errorBody(c, "not_found"), 404);
       }
