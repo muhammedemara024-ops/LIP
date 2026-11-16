@@ -3,6 +3,7 @@
   "references": [
     { "path": "./packages/adapter-kit" },
     { "path": "./packages/identity" },
+    { "path": "./apps/bff" },
     { "path": "./apps/cloud" },
     { "path": "./apps/wallet" },
     { "path": "./packages/protocol" },

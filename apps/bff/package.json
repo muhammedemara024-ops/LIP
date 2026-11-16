@@ -1,0 +1,25 @@
+{
+  "name": "@loyalty-interchange/bff",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Wanees backend-for-frontend: customer, staff, owner and operator API surface over LIP.",
+  "type": "module",
+  "main": "./dist/server.js",
+  "types": "./dist/server.d.ts",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.6",
+    "@loyalty-interchange/identity": "0.2.0",
+    "@loyalty-interchange/sdk": "0.2.0",
+    "@loyalty-interchange/storage-postgres": "0.2.0",
+    "@sinclair/typebox": "^0.34.52",
+    "ajv": "^8.20.0",
+    "hono": "4.13.17",
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.20.0"
+  }
+}

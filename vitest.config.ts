@@ -20,7 +20,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary"],
-      include: ["packages/*/src/**/*.ts"],
+      include: ["packages/*/src/**/*.ts", "apps/bff/src/**/*.ts"],
       exclude: [
         "packages/server/src/cli.ts",
         "packages/server/src/platform.ts",
