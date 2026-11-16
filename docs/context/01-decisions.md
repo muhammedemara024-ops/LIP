@@ -2393,6 +2393,21 @@ Consequences: `.agents/skills/wanees-phase/SKILL.md` no longer states that the o
 
 Date / approved by: 2026-11-16, project owner. Recorded by Claude Opus 5.5 as orchestrator.
 
+## PD-050 — Direct-to-main delivery for Wanees development; PD-049 PR flow dormant — Approved (2026-11-16)
+
+Context: the owner directed on 2026-11-16: "I authorize normal commits and direct fast-forward pushes to main for completed, reviewed, authorized development tasks. Do not create new PRs for routine Phase delivery." The GitHub `main` ruleset "main protection (PD-049)" required a pull request, a `verify` check and a `Claude PR Review` check, and its Claude review was failing on the Anthropic API.
+
+Decision:
+1. **Direct delivery.** Routine delivery is a fast-forward push to `main` from a worktree or branch that contains the latest `origin/main`. No PR is created unless the owner asks for one.
+2. **Ruleset.** The `main` ruleset keeps `deletion` and `non_fast_forward` and has no bypass actor. Its `pull_request` and `required_status_checks` rules (including `verify` and `Claude PR Review`) are removed, because GitHub cannot accept a direct push to a branch that requires a PR or status checks. The `verify` CI workflow still runs on every push to `main`; its result is inspected after the push.
+3. **Gates preserved before each push.** Task authorization and closed gates; relevant tests and the standard verification; an independent review (AGENTS §5, G02) that passes on the exact content pushed; `main` fast-forwardable. CI moves from a pre-merge gate to a post-push check, so these local conditions are the gate.
+4. **PD-049 status.** The Claude PR review and auto-merge workflows stay in the repository, dormant for direct delivery. `LIP_AUTOMERGE_ENABLED` stays `false`; native auto-merge stays off. PD-049 items stay as history; nothing in it authorizes a PR for routine delivery any more.
+5. **Not authorized.** Force pushes, branch deletion, deployment, application-secret changes, any task lacking its own authorization and any bypass actor.
+
+Consequences: `AGENTS.md` §2 table row and §8, rule 04 item 5 and `.agents/skills/wanees-phase/SKILL.md` §7 are updated; `references/pr-template.md` is retained only for owner-requested PRs.
+
+Date / approved by: 2026-11-16, project owner. Recorded by Claude Sonnet 5.5 as orchestrator.
+
 ---
 
 Template for new entries:

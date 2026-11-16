@@ -46,6 +46,6 @@ description: 3-tier task workflow, Matt Pocock default workflow & Spec Kit optio
    - Never push to `upstream` (`craveup-oss/loyalty-interchange-protocol`).
    - Never force-push `main`.
    - Never commit secrets, `.env` files, credentials, or local runtime state (`.lip/`).
-   - Never commit or push without explicit user authorization (`implement` must never auto-commit).
+   - Never commit or push without explicit user authorization (`implement` must never auto-commit). The only standing authorization is `PD-050`: normal commits and fast-forward pushes to `main` of completed, reviewed, authorized tasks, after passing verification, an independent review of the exact pushed content and a fetch showing `main` can fast-forward. No force push, no remote branch deletion.
    - Never deploy or modify production data without explicit user authorization.
    - Always preserve unrelated working-tree changes.

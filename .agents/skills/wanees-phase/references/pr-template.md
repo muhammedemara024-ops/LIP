@@ -1,3 +1,5 @@
+> **Not used for routine delivery (PD-050).** Phases deliver by fast-forward push to `main`. Use this template only when the owner explicitly asks for a PR.
+
 # Phase PR template
 
 Title: `feat(wanees): Phase <n> — <Phase title> (<Txxx, …>)`

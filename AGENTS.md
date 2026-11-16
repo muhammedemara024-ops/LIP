@@ -75,7 +75,7 @@ Repository instructions in [`AGENTS.md`](AGENTS.md), [`.specify/memory/constitut
 | `.claude/skills/speckit-*` | **Spec Kit Claude Code integration copies** of the same commands (`.specify/integrations/claude.manifest.json`). | Managed by `specify` CLI. Do not hand-edit. Currently untracked: preserve them, and track them only with owner approval. |
 | [`docs/agents/`](docs/agents/) | **LIP Skill Configuration** ([`domain.md`](docs/agents/domain.md) and [`issue-tracker.md`](docs/agents/issue-tracker.md)). | Binds skills to `docs/context/` and `.scratch/<feature-slug>/`. |
 | [`skills/lip*`](skills/) | **Published Upstream Consumer Skills** (`lip`, `lip-bff`, `lip-checkout`, `lip-cli`, `lip-conformance`, `lip-sdk`, `lip-webhooks`) for external developers integrating with LIP. | Part of the public release surface verified by `npm run docs:check`. Only update when LIP public API/CLI contracts change. |
-| [`.agents/skills/wanees-phase/`](.agents/skills/wanees-phase/) and its pointer `.claude/skills/wanees-phase/` | **Project Phase-execution workflow** (`/wanees-phase`): one Spec Kit Phase → one branch → authorized tasks through the delegate lanes → Phase verification → independent Phase review → owner-authorized commit, push and PR. | Project-owned procedure only. It never sets gates, approvals or routing, and this file, the constitution and the rules prevail over it. Change it only through the review policy in §5. |
+| [`.agents/skills/wanees-phase/`](.agents/skills/wanees-phase/) and its pointer `.claude/skills/wanees-phase/` | **Project Phase-execution workflow** (`/wanees-phase`): one Spec Kit Phase → one branch → authorized tasks through the delegate lanes → Phase verification → independent Phase review → commit and fast-forward push directly to `main` (`PD-050`). | Project-owned procedure only. It never sets gates, approvals or routing, and this file, the constitution and the rules prevail over it. Change it only through the review policy in §5. |
 | [`.claude/skills/`](.claude/skills/) (all other entries) | **Legacy Claude Code Workflow Skills** preserved from Phase 0. | Preserve intact as historical snapshots; do not modify or delete. |
 | User-level `codex-delegate`, `claude-delegate`, `agy-delegate` (outside the repo) | **Delegate relays** that dispatch the lanes in `.delegate/config.json` (§5). | Not part of the repository. |
 
@@ -285,11 +285,12 @@ Follow [rule 03](.agents/rules/03-testing-and-verification.md). In particular, *
 ## 8. Git & Deployment Restrictions
 
 - **Remotes**: `origin` (`https://github.com/muhammedemara024-ops/LIP.git`); `upstream` (`https://github.com/craveup-oss/loyalty-interchange-protocol.git`, fetch-only, `pushurl = DISABLED`).
+- **Direct delivery to `main` (`PD-050`, owner-authorized 2026-11-16).** Normal commits and fast-forward pushes to `main` are authorized for completed, reviewed, authorized tasks, and no PR is opened for routine Phase delivery. Before each push, all of these must hold: task authorization and closed gates; relevant tests and the standard verification (rule 03); an independent review that passes and covers the exact content pushed (§5); the branch contains the latest `origin/main`. The `main` ruleset still prohibits force pushes and deletion and has no bypass actor. This changes no approval gate and authorizes no deployment, secrets change or unauthorized task.
 - **Strict Rules**:
   - Never push to `upstream`.
   - Never force-push `main`.
   - Never commit secrets, `.env` files, credentials, or runtime state (`.lip/`).
-  - Never commit or push without explicit user authorization.
+  - Never commit or push without explicit user authorization (`PD-050` is the standing authorization described above and nothing wider).
   - Never deploy or modify production data without explicit user authorization.
   - Always preserve unrelated working-tree changes.
 

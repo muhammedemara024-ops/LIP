@@ -1,9 +1,9 @@
 ---
 name: wanees-phase
-description: Run one Wanees Spec Kit Phase end to end with the delegate fleet. It inspects Phase status, picks the next eligible Phase or resumes one, executes only owner-authorized tasks, runs Phase verification and one independent Phase review, then prepares one PR per Phase. Commit, push and PR need explicit owner authorization. Use for "/wanees-phase", "run the next phase", "resume phase N", "phase status".
+description: Run one Wanees Spec Kit Phase end to end with the delegate fleet. It inspects Phase status, picks the next eligible Phase or resumes one, executes only owner-authorized tasks, runs Phase verification and one independent Phase review, then delivers by fast-forward push to main (PD-050). Force pushes, deployment and unauthorized tasks stay forbidden. Use for "/wanees-phase", "run the next phase", "resume phase N", "phase status".
 ---
 
-# wanees-phase — one Phase, one branch, one PR
+# wanees-phase — one Phase, reviewed, delivered directly to main
 
 **Scope.** This skill executes the approved cards in `specs/002-p0-prd/tasks.md` through the delegate fleet. It is a procedure only: it never sets gates, approvals or routing. `AGENTS.md` §5 (G02, `PD-048`), the constitution, `.agents/rules/` and `.delegate/config.json` own those, and they prevail over this file.
 
@@ -13,16 +13,15 @@ description: Run one Wanees Spec Kit Phase end to end with the delegate fleet. I
 3. Execute the authorized tasks.
 4. Phase verification.
 5. Independent Phase review.
-6. **Owner authorization.**
-7. Commit, push, open one PR.
-8. Merge (PD-049): an eligible Phase PR may merge through the Claude Auto-Merge Gate workflow; a sensitive one waits for the owner's merge.
+6. Pre-push conditions (§7).
+7. Commit and fast-forward push to `main` (PD-050); record the SHA.
 
 **Arguments:**
 - none or `status`: report only.
 - `next`: select and run the next eligible Phase.
 - `phase <n>`: run or resume Phase `n`.
 - `resume`: continue the Phase recorded in state.
-- `pr <n>`: prepare the commit and PR package for a Phase that has already passed review.
+- `pr <n>`: prepare the commit package for a Phase that has already passed review (direct delivery; no PR unless the owner asks).
 
 ## Hard rules (never relaxed by this skill)
 
@@ -44,15 +43,14 @@ description: Run one Wanees Spec Kit Phase end to end with the delegate fleet. I
    - quote the owner's words in `.scratch/wanees-phases/phase-<n>/log.md`.
 
    Record only what the owner actually wrote.
-3. **Commit, push and PR creation each need the owner's explicit authorization for this Phase** (constitution X.4; `AGENTS.md` §5 *Approval Boundaries*, §8).
-   - One owner message may grant several of them only if it names each one.
+3. **Commit and push need owner authorization** (constitution X.4; `AGENTS.md` §5 *Approval Boundaries*, §8). `PD-050` is the owner's standing authorization for normal commits and fast-forward pushes to `main` of completed, reviewed, authorized tasks only; it does not authorize deployment, secrets changes, force pushes or any unauthorized task. Anything outside `PD-050` needs a fresh explicit authorization naming each action.
    - None of these counts as authorization:
      - a review verdict;
      - invoking this skill;
      - an earlier Phase's authorization;
      - anything you recorded yourself.
 4. **No destructive Git operations without explicit owner authorization.**
-   - Never merge yourself. Only the owner or the Claude Auto-Merge Gate workflow (PD-049) merges a Phase PR.
+   - Never force-push and never delete remote branches. Never enable `LIP_AUTOMERGE_ENABLED` or native auto-merge.
    - Never run any of these:
      - `rebase`, `reset`, `stash`, `clean`;
      - `restore` or `checkout -- <path>`;
@@ -280,39 +278,23 @@ Build the change sets from the recorded patches. Each reviewer runs read-only in
   - Never package while a HIGH or MEDIUM finding is open.
   - Any edit made after a review needs a re-review of the changed content.
 
-## 7. Commit, push, PR (owner-gated)
+## 7. Commit and push to main (direct delivery, PD-050)
 
-1. **Assemble the package.** It contains:
-   - the exact Phase-owned files, with unrelated and baseline files excluded and `baseline-not-in-git` resolved;
-   - proof that each file's current SHA-256 equals the hash recorded by its passing review;
-   - a secrets and PII scan;
-   - the passing checks;
-   - the proposed conventional commits;
-   - the PR body from `references/pr-template.md`.
-2. **Ask the owner** in one message, naming three separate actions:
-   - commit these files with these messages;
-   - push `feat/wanees-phase-<n>` to `origin`;
-   - open one PR against `main`.
+Routine Phase delivery lands directly on `main` by fast-forward push. Do not open a PR for routine delivery. The owner's standing authorization (PD-050) covers normal commits and fast-forward pushes to `main` only for completed, reviewed, authorized tasks; it never covers force pushes, deployment, secrets or any unauthorized task.
 
-   Stop until the owner answers. Record the answer verbatim in `log.md`.
-3. **Commit**, once per planned commit:
-   1. `git add -- "<file1>" "<file2>" …` (exact files only).
-   2. Check that `git diff --cached --name-only` equals exactly those files plus `.gitattributes`. If not, STOP.
-   3. `git commit -m "<msg>" -- "<file1>" "<file2>" …`. The pathspec uses `--only` semantics, so `.gitattributes` stays staged and stays out of the commit.
-   4. Check all of the following:
-      - `git show --stat HEAD` lists exactly the presented files;
-      - `git rev-parse HEAD:"<path>"` equals each file's reviewed blob id;
-      - `git diff --cached --name-only` still shows `.gitattributes`.
-
-   If any check fails, STOP and do not push. The push and PR authorizations become void; report to the owner. Do not amend or reset without owner authorization.
-4. **Push:** `git push -u origin "feat/wanees-phase-<n>"`. Never force.
-5. **PR.**
-   - First check for an existing one: `gh pr list --repo muhammedemara024-ops/LIP --head "feat/wanees-phase-<n>" --state all`.
-   - Only if none exists: `gh pr create --repo muhammedemara024-ops/LIP --base main --head "feat/wanees-phase-<n>" --title "<title>" --body-file "<file>"`.
-   - Record the URL and leave the PR open. **You never merge.** The Claude Auto-Merge Gate workflow merges it only if it is eligible (PD-049); otherwise the owner merges.
-6. **Later tasks in the same Phase.**
-   - Authorized while the PR is open: add them to the same branch and PR. They need the same verification, a re-review of the new content, and fresh owner commit and push authorization.
-   - The PR has already merged: stop and ask the owner about a continuation branch, because the one-PR-per-Phase target cannot hold.
+1. **Assemble the package.** It contains the exact Phase-owned files (unrelated and baseline files excluded), proof that each file's current SHA-256 equals the hash recorded by its passing review, a secrets and PII scan, the passing checks, and the proposed conventional commits.
+2. **Pre-push conditions (all required, in order):**
+   - every task in the commit is authorized and its gates are closed (hard rule 1);
+   - Phase verification (§5) passed in the delivery worktree, with exact counts and environment;
+   - the independent review (§6) passed on exactly the content to be pushed (blobs equal);
+   - `git fetch origin` done and the delivery branch contains `origin/main` (fast-forward possible).
+   If any fails, STOP and do not push.
+3. **Deliver from a separate worktree** based on the latest `origin/main` when the local checkout is behind or dirty: `git worktree add -b "deliver/<slug>" "<path>" origin/main`, cherry-pick or commit the Phase files there, re-verify, re-confirm blobs.
+4. **Commit**, once per planned commit: `git add -- "<files>"`; check `git diff --cached --name-only` equals exactly those files (plus a pre-staged `.gitattributes` only in the primary checkout); `git commit -m "<msg>" -- "<files>"`; check `git show --stat HEAD` and each `git rev-parse HEAD:"<path>"` equals the reviewed blob id.
+5. **Push:** `git push origin "HEAD:main"` (fast-forward only). Never force, never `--force-with-lease`, never delete a branch on `origin`. If the push is rejected, `git fetch`, re-verify the changed base, and retry at most once; otherwise STOP.
+6. **After the push:** record the new `main` SHA in `state.json` (`stage: merged`, `delivery: "direct-main"`) and `log.md`; inspect the GitHub Actions run for that SHA and report its result.
+7. **Later tasks:** each new set of authorized tasks repeats §4–§7 with its own review.
+8. **Exception:** a PR is opened only if the owner explicitly asks for one for a specific change.
 
 ## 8. State and resume
 
