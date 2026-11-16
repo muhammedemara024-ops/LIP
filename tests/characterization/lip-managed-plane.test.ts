@@ -29,8 +29,12 @@ interface Plane {
   readonly cafes: readonly Cafe[];
   close(): Promise<void>;
 }
+interface FixtureCafe {
+  readonly cafe: Cafe;
+  readonly branches: readonly [{ readonly branchId: string }, { readonly branchId: string }];
+}
 interface World {
-  readonly cafes: readonly [{ readonly cafe: Cafe; readonly branches: readonly [{ readonly branchId: string }, unknown] }, unknown];
+  readonly cafes: readonly [FixtureCafe, FixtureCafe];
 }
 interface Database {
   readonly url: string;
@@ -307,5 +311,154 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
       client().redemptions.capture({ reservation_id: reserved.reservation.reservation_id, order_id: `ro-zero-${member}` } as never, { idempotencyKey: `capture:r-zero-${member}` })
     );
     expect(captured.reservation.status).toBe("captured");
+  });
+  it("keeps the plane open for a ready environment with no subscription or usage record and refuses it once the environment is not ready (PD-005 A2 input)", async () => {
+    // The managed data plane consults only the environment status and the write freeze. It reads no
+    // subscription, usage event or billing state, so it cannot refuse an active manual subscription that
+    // has no usage events. Source read: apps/cloud/src/managed-data-plane.ts (status gate, isWriteFrozen).
+    // Executed here: a ready environment serves, a suspended one is refused.
+    const member = await freshMember();
+    await accrue(member, `sub-${member}`, 1000);
+    const holder = cafe().cafe as unknown as { environment: { status: string } };
+    holder.environment.status = "suspended";
+    try {
+      const refused = await refusal(() => client().accounts.get({ member_id: member, program_id: programId() }));
+      expect([401, 403, 404, 409, 503]).toContain(refused.status);
+    } finally {
+      holder.environment.status = "ready";
+    }
+    expect((await balances(member))["points"]!.amount).toBeGreaterThan(0);
+  });
+
+  it("does not cache a refused request: the same idempotency key succeeds once the refusal cause is gone (R-07, OD-15)", async () => {
+    const member = await freshMember();
+    const attempt = () => reserve(member, `r-refused-${member}`, "one-dollar-off", `ro-refused-${member}`, 1000);
+    const refused = await refusal(attempt); // no credits yet
+    expect(refused.status).toBe(409);
+    await accrue(member, `fund-${member}`, 5000);
+    const reserved = await attempt(); // identical key and redemption id
+    expect(reserved.reservation.status).toBe("reserved");
+  });
+
+  it("keeps a stored reserved reservation blocking cancel after its expiry until a call applies the expiry (check a)", async () => {
+    const member = await freshMember();
+    await reachThreeStamps(member, "stale");
+    const reserved = await reserve(member, `r-stale-${member}`, "free-entree", `ro-stale-${member}`, 1200, `stamp-${member}-1`);
+    await sleep((RESERVATION_TTL_SECONDS + 1.5) * 1000);
+    const cancel = (key: string) =>
+      refusal(() => client().issuedRewards.cancel({ issued_reward_id: `stamp-${member}-1`, reason: "characterization" } as never, { idempotencyKey: key }));
+    // Observed: expiry is applied lazily, so the stale stored status still blocks the cancel.
+    expect(await cancel(`cancel-stale-1:${member}`)).toEqual({ status: 409, code: "invalid_state" });
+    // A capture that touches the reservation applies the expiry...
+    const late = await refusal(() =>
+      client().redemptions.capture({ reservation_id: reserved.reservation.reservation_id, order_id: `ro-stale-${member}` } as never, { idempotencyKey: `capture-stale:${member}` })
+    );
+    expect(late).toEqual({ status: 409, code: "expired" });
+    // Observed: even after the expiry was applied, the issued reward still cannot be cancelled.
+    expect(await cancel(`cancel-stale-2:${member}`)).toEqual({ status: 409, code: "invalid_state" });
+    // Observed: a fresh reserve (new redemption and order ids) of the same issued reward is refused 409 conflict too,
+    // so an expired reservation leaves the stamp reward stuck for both cancel and re-reserve (owner decision item).
+    const again = await reserve(member, `r-stale-again-${member}`, "free-entree", `ro-stale-again-${member}`, 1200, `stamp-${member}-1`).then(
+      () => "reserved",
+      (error: unknown) => `refused:${(error as { status?: number }).status}:${(error as { code?: string }).code}`
+    );
+    expect(again).toBe("refused:409:conflict");
+  });
+
+  it("never duplicates a write whose client gave up, and a same-body retry returns to a single entry (R-07 input)", async () => {
+    // Source read: neither packages/server nor apps/cloud sets a statement or request timeout, so a write
+    // is bounded only by Node's default HTTP request timeout. This test executes the safe property only:
+    // after a client abort and a same-key, same-body retry the ledger holds exactly one accrual.
+    const member = await freshMember();
+    const orderId = `abort-${member}`;
+    const body = JSON.stringify({
+      context: { protocol_version: "1.0", profile: "foodservice/1.0", request_id: `request_${member}`, idempotency_key: `accrue:${orderId}`, occurred_at: "2026-07-14T10:08:00.000Z", source: { system: "lip-sdk" } },
+      member_id: member,
+      order: order(member, orderId, 1000)
+    });
+    const send = (signal?: AbortSignal) =>
+      fetch(`${cafe().cafe.lipBaseUrl}/lip/v1/accruals`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${cafe().cafe.merchantApiKey}`, "content-type": "application/json" },
+        body,
+        ...(signal === undefined ? {} : { signal })
+      });
+    const controller = new AbortController();
+    const first = send(controller.signal).catch(() => undefined);
+    setTimeout(() => controller.abort(), 15);
+    await first;
+    await sleep(3000);
+    for (let i = 0; i < 12; i += 1) {
+      const retry = await send();
+      if (retry.status !== 500) break;
+      await sleep(250);
+    }
+    const ledger = await retry500(() => client().ledger.list({ member_id: member, program_id: programId(), limit: 100 } as never));
+    const points = ledger.entries.filter((entry) => entry.order_id === orderId && entry.unit === "points");
+    expect(points).toHaveLength(1);
+  });
+
+  it("keeps the quoted hold cost when the program is republished with a different reward cost before capture (PD-025)", async () => {
+    const other = world.cafes[1].cafe;
+    const member = fx.memberId(`republish-${Date.now()}`);
+    await retry500(() =>
+      other.client.members.enroll(
+        { program_id: other.programId, identity: { type: "token", value: `fixture-identity-${member}`, issuer: "fixture-identity" }, member_id: member },
+        { idempotencyKey: `enroll:${member}` }
+      )
+    );
+    const location = world.cafes[1].branches[0].branchId;
+    const buildOrder = (orderId: string, amount: number, status: "open" | "paid") => {
+      const builder = new FoodserviceOrderBuilder({
+        orderId,
+        scope: { program_id: other.programId, brand_id: "b1", merchant_id: "m1", location_id: location },
+        memberId: member,
+        currency: "USD",
+        channel: "counter",
+        businessDate: "2026-07-14",
+        status
+      }).addItem({ lineId: "l1", productId: "meal", name: "Meal", unitPrice: money(amount, "USD") });
+      if (status === "paid") builder.addTender({ tenderId: "t1", type: "cash", amount: money(amount, "USD") }).close("2026-07-14T10:08:00.000Z");
+      return builder.build();
+    };
+    await retry500(() => other.client.accruals.post({ member_id: member, order: buildOrder(`rp-fund-${member}`, 5000, "paid") }, { idempotencyKey: `accrue:rp-fund-${member}` }));
+    const reserved = await retry500(() =>
+      other.client.redemptions.reserve(
+        { redemption_id: `r-rp-${member}`, member_id: member, reward_id: "one-dollar-off", order: buildOrder(`ro-rp-${member}`, 1000, "open") } as never,
+        { idempotencyKey: `reserve:r-rp-${member}` }
+      )
+    );
+    expect(reserved.reservation.cost).toEqual({ unit: "credits", amount: 50 });
+
+    const admin = async (method: string, path: string, requestBody: unknown): Promise<Record<string, unknown>> => {
+      for (let i = 0; i < 12; i += 1) {
+        const response = await fetch(`${other.lipBaseUrl}${path}`, {
+          method,
+          headers: { authorization: `Bearer ${other.merchantApiKey}`, "content-type": "application/json" },
+          body: JSON.stringify(requestBody)
+        });
+        if (response.status === 500) {
+          await sleep(250);
+          continue;
+        }
+        expect(response.ok).toBe(true);
+        return (await response.json()) as Record<string, unknown>;
+      }
+      throw new Error("admin request kept answering 500");
+    };
+    const base = makeHybridProgram();
+    const republished = {
+      ...base,
+      program_id: other.programId,
+      reservation_ttl_seconds: RESERVATION_TTL_SECONDS,
+      rewards: base.rewards.map((reward) => (reward.reward_id === "one-dollar-off" ? { ...reward, cost: { unit: "credits", amount: 80 } } : reward))
+    };
+    const draft = (await admin("PUT", "/admin/api/v1/program/draft", { program: republished }))["draft"] as { version: number };
+    await admin("POST", "/admin/api/v1/program/publish", { expected_draft_version: draft.version });
+
+    const captured = await retry500(() =>
+      other.client.redemptions.capture({ reservation_id: reserved.reservation.reservation_id, order_id: `ro-rp-${member}` } as never, { idempotencyKey: `capture:r-rp-${member}` })
+    );
+    expect(captured.reservation.cost).toEqual({ unit: "credits", amount: 50 });
   });
 });
