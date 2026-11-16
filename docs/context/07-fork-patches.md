@@ -173,7 +173,7 @@ npm audit
 
 - **File modified:** `.github/workflows/ci.yml` (upstream). `on.push.branches` changes from `[main]` to `[main, "deliver/**"]`, plus a one-line comment. No other line changes.
 - **Reason:** direct-to-main delivery (PD-050) keeps the required `verify` check on the `main` ruleset. GitHub accepts a push to a branch with required status checks only when the checks already passed on that commit on another ref, so `verify` must run on the delivery branch first.
-- **Behaviour impact:** none on `/lip/v1`, `spec/`, packages or runtime. One extra CI run per delivery branch push.
+- **Behaviour impact:** none on `/lip/v1`, `spec/`, packages or runtime. One extra CI run per delivery branch push, which also triggers the inert `claude-auto-merge` `workflow_run` (its merge job requires a `pull_request` event).
 - **Test coverage:** exercised by the first delivery (the `deliver/phase-1` run of `verify`); a missing run blocks the push to `main`.
 - **Rollback:** restore `branches: [main]`; delivery would then need a PR or an owner ruleset change.
 - **Upgrade impact:** trivial merge.
