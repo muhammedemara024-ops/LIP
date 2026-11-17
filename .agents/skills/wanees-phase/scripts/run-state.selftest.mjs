@@ -51,6 +51,14 @@ function fixture({ cards, auth = "" }) {
 }
 const tasksPath = (f) => join(f.dir, "specs/002-p0-prd/tasks.md");
 const tick = (f, id) => writeFileSync(tasksPath(f), readFileSync(tasksPath(f), "utf8").replace(`- [ ] ${id} `, `- [x] ${id} `));
+const commitTick = (f, id, msg = "deliver") => { // the delivered commit: ticks the task in tasks.md, pushed fast-forward to origin/main
+  tick(f, id);
+  execFileSync("git", ["add", "--", "specs/002-p0-prd/tasks.md"], { cwd: f.dir, stdio: "ignore" });
+  execFileSync("git", [...GIT, "commit", "-q", "-m", `${msg} ${id}`], { cwd: f.dir, stdio: "ignore" });
+  execFileSync("git", ["push", "-q", "origin", "main"], { cwd: f.dir });
+  execFileSync("git", ["fetch", "-q", "origin"], { cwd: f.dir });
+  return execFileSync("git", ["rev-parse", "HEAD"], { cwd: f.dir, encoding: "utf8" }).trim();
+};
 const realCommit = (f) => { // a real commit pushed to origin/main (the "delivery")
   execFileSync("git", [...GIT, "commit", "-q", "--allow-empty", "-m", `delivery ${Math.random()}`], { cwd: f.dir });
   execFileSync("git", ["push", "-q", "origin", "main"], { cwd: f.dir });
@@ -63,13 +71,13 @@ const rs = (f, ...args) => {
   catch (e) { return JSON.parse(String(e.stdout)); }
 };
 const statusOf = (dir) => JSON.parse(execFileSync("node", [STATUS, "--repo", dir, "--json"], { encoding: "utf8", env: { ...process.env, WANEES_STATE_ROOT: "" } }));
-// Full task cycle in the order the loop requires: start -> (verify, review) -> deliver -> done -> tick landed on main.
-const ship = (f, id, sha = fake(1), { tickIt = true } = {}) => {
+// Full task cycle in the order the loop requires: start -> (verify, review) -> delivered commit that ticks the task -> deliver -> done.
+const ship = (f, id) => {
   rs(f, "start", id);
-  rs(f, "deliver", "--sha", sha, "--tasks", id, "--ci", CI);
+  const sha = commitTick(f, id);
+  const dl = rs(f, "deliver", "--sha", sha, "--tasks", id, "--ci", CI);
   const d = rs(f, "done", id, "--evidence", `tests ok for ${id}`, "--sha", sha);
-  if (tickIt) tick(f, id);
-  return d;
+  return { ...d, sha, deliverOk: dl.ok };
 };
 
 let passed = 0, failed = 0;
@@ -106,15 +114,22 @@ const files = (f, runId) => existsSync(join(f.ev, "runs", runId)) ? readdirSync(
   check("3. done before delivery is refused", rs(f, "done", "T010", "--evidence", "e", "--sha", fake(2)).ok === false);
   check("3. deliver without --ci is refused", rs(f, "deliver", "--sha", fake(2), "--tasks", "T010").ok === false);
   check("3. deliver rejects a short sha", rs(f, "deliver", "--sha", "abc", "--tasks", "T010", "--ci", CI).ok === false);
-  const d1 = rs(f, "deliver", "--sha", fake(2), "--tasks", "T010", "--ci", CI);
-  rs(f, "deliver", "--sha", fake(2), "--tasks", "T010", "--ci", CI);
+  check("3. N1 deliver rejects a sha that is not a commit", rs(f, "deliver", "--sha", fake(2), "--tasks", "T010", "--ci", CI).ok === false);
+  const base = execFileSync("git", ["rev-parse", "HEAD"], { cwd: f.dir, encoding: "utf8" }).trim();
+  check("3. N1 deliver rejects the run's base commit (not newer)", rs(f, "deliver", "--sha", base, "--tasks", "T010", "--ci", CI).ok === false);
+  const empty = realCommit(f);
+  check("3. N1 deliver rejects a real new commit that does not tick the task", rs(f, "deliver", "--sha", empty, "--tasks", "T010", "--ci", CI).ok === false);
+  const sha = commitTick(f, "T010");
+  const d1 = rs(f, "deliver", "--sha", sha, "--tasks", "T010", "--ci", CI);
+  rs(f, "deliver", "--sha", sha, "--tasks", "T010", "--ci", CI);
+  const nrd = rs(f, "next");
+  check("3. N2 between deliver and done, next says record-done (never park or redo)", nrd.action === "record-done" && nrd.sha === sha, nrd);
   check("3. done with a sha that is not the recorded delivery is refused", rs(f, "done", "T010", "--evidence", "e", "--sha", fake(9)).ok === false);
-  rs(f, "done", "T010", "--evidence", "e", "--sha", fake(2));
-  tick(f, "T010");
+  rs(f, "done", "T010", "--evidence", "e", "--sha", sha);
   const n = rs(f, "next");
   check("3. after delivery + done, next still executes", d1.ok === true && n.action === "execute" && n.task === "T011", [d1, n]);
   const rep = rs(f, "report");
-  check("3. delivery recorded once with its sha on the completed task", rep.run.deliveries.length === 1 && rep.run.completed[0].sha === fake(2), rep.run);
+  check("3. delivery recorded once with its sha on the completed task", rep.run.deliveries.length === 1 && rep.run.completed[0].sha === sha, rep.run);
 }
 
 // 4. Blocked task -> unrelated eligible task proceeds; a parked task never unlocks its dependant; a delivered task cannot be parked.
@@ -139,11 +154,11 @@ const files = (f, runId) => existsSync(join(f.ev, "runs", runId)) ? readdirSync(
   rs(f, "init");
   rs(f, "start", "T010");
   check("4b. before delivery the dependant is waiting-deps", statusOf(f.dir).tasks.T012.status === "waiting-deps");
-  rs(f, "deliver", "--sha", fake(3), "--tasks", "T010", "--ci", CI);
-  rs(f, "done", "T010", "--evidence", "ok", "--sha", fake(3));
-  check("4b. done recorded but not ticked: still waiting, T010 is done-pending-tick (never re-queued)", statusOf(f.dir).tasks.T012.status === "waiting-deps" && statusOf(f.dir).tasks.T010.status === "done-pending-tick");
-  tick(f, "T010");
-  check("4b. ticked: dependant becomes a candidate", statusOf(f.dir).tasks.T012.status === "candidate");
+  const sha = commitTick(f, "T010");
+  rs(f, "deliver", "--sha", sha, "--tasks", "T010", "--ci", CI);
+  check("4b. delivered but done not yet recorded: T010 is done-unverified, the dependant still waits", statusOf(f.dir).tasks.T012.status === "waiting-deps" && statusOf(f.dir).tasks.T010.status === "done-unverified");
+  rs(f, "done", "T010", "--evidence", "ok", "--sha", sha);
+  check("4b. done recorded after delivery: the dependant becomes a candidate", statusOf(f.dir).tasks.T012.status === "candidate");
 }
 
 // 5. Existing batch authorization -> no repeat approval prompt; batch label parsed; batch revocation fails closed or revokes the batch.
@@ -156,7 +171,7 @@ const files = (f, runId) => existsSync(join(f.ev, "runs", runId)) ? readdirSync(
   for (let i = 0; i < 3; i += 1) {
     const n = rs(f, "next");
     seen.push(`${n.action}:${n.task}`);
-    ship(f, n.task, fake(i + 1));
+    ship(f, n.task);
   }
   check("5. all three batch tasks run without any approval request", seen.join() === "execute:T010,execute:T011,execute:T012", seen);
   check("5. the request, when nothing is eligible, lists no tasks", statusOf(f.dir).consolidatedApprovalRequest.tasks.length === 0);
@@ -167,6 +182,8 @@ const files = (f, runId) => existsSync(join(f.ev, "runs", runId)) ? readdirSync(
   check("5. revoking the batch label revokes its tasks", statusOf(batch.dir).queue.length === 0, statusOf(batch.dir).queue);
   const bad = fixture({ auth: AUTH("T010 and T011") + REVOKE("T010 or maybe T011"), cards });
   check("5. an unparseable revocation blocks every candidate (fail closed)", statusOf(bad.dir).queue.length === 0 && statusOf(bad.dir).warnings.some((w) => w.includes("did not parse")), statusOf(bad.dir).queue);
+  const loose = fixture({ auth: AUTH("T010 and T011") + " The authorization for T010 is revoked.", cards });
+  check("5. L11 a differently worded revocation also fails closed", statusOf(loose.dir).queue.length === 0, statusOf(loose.dir).queue);
   const ok = fixture({ auth: AUTH("T010 and T011") + REVOKE("T010"), cards });
   check("5. a parsed single revocation removes only that task", statusOf(ok.dir).queue.map((q) => q.id).join() === "T011");
 }
@@ -210,8 +227,8 @@ const files = (f, runId) => existsSync(join(f.ev, "runs", runId)) ? readdirSync(
   tick(f, "T010");
   const n2 = rs(f, "next");
   check("7. a task already done in reality is not redone", n2.action === "execute" && n2.task === "T011", n2);
-  ship(f, "T011", fake(4));
-  const dup = rs(f, "done", "T011", "--evidence", "e again", "--sha", fake(4));
+  const shipped = ship(f, "T011");
+  const dup = rs(f, "done", "T011", "--evidence", "e again", "--sha", shipped.sha);
   check("7. recording done twice does not duplicate", dup.recorded === false && rs(f, "report").run.completed.filter((c) => c.task === "T011").length === 1, dup);
   const stale = join(f.ev, "PHASE-COMPLETE.flag");
   writeFileSync(stale, "x");
@@ -252,10 +269,10 @@ const files = (f, runId) => existsSync(join(f.ev, "runs", runId)) ? readdirSync(
 {
   const f = fixture({ auth: AUTH("T010 and T011"), cards: [{ id: "T010", phase: 1 }, { id: "T011", phase: 1 }] });
   const run = rs(f, "init");
-  ship(f, "T010", realCommit(f));
+  ship(f, "T010");
   const partial = rs(f, "finish");
   check("8. partial completion -> BLOCKED, no success flag", partial.outcome === "BLOCKED" && !files(f, run.runId).some((n) => n.startsWith("COMPLETE-")), [partial, files(f, run.runId)]);
-  ship(f, "T011", realCommit(f));
+  ship(f, "T011");
   const tip = execFileSync("git", ["rev-parse", "origin/main"], { cwd: f.dir, encoding: "utf8" }).trim();
   const full = rs(f, "finish");
   const flagPath = join(f.ev, "runs", run.runId, `COMPLETE-${run.runId}.flag`);
@@ -268,14 +285,15 @@ const files = (f, runId) => existsSync(join(f.ev, "runs", runId)) ? readdirSync(
 {
   const f = fixture({ auth: AUTH("T010"), cards: [{ id: "T010", phase: 1 }] });
   const run = rs(f, "init");
-  ship(f, "T010", fake(7)); // a sha that is not on origin/main
+  ship(f, "T010");
+  writeFileSync(tasksPath(f), readFileSync(tasksPath(f), "utf8") + "\nlocal edit\n");
   const fin = rs(f, "finish");
-  check("8c. a delivery that is not an ancestor of origin/main -> no flag", fin.outcome === "BLOCKED" && fin.reasons.some((r) => r.includes("not an ancestor")) && !files(f, run.runId).some((n) => n.startsWith("COMPLETE-")), fin);
+  check("8c. a tasks.md that differs from origin/main -> no flag (judged on the delivered file)", fin.outcome === "BLOCKED" && fin.reasons.some((r) => r.includes("differs from origin/main")) && !files(f, run.runId).some((n) => n.startsWith("COMPLETE-")), fin);
 }
 {
   const f = fixture({ auth: AUTH("T010"), cards: [{ id: "T010", phase: 1 }] });
   rs(f, "init");
-  ship(f, "T010", realCommit(f));
+  ship(f, "T010");
   unlinkSync(join(f.dir, ".git/delegate-skills/project-config.sha256")); // fleet no longer trusted
   const fin = rs(f, "finish");
   check("8d. a fleet fault -> no flag", fin.outcome === "BLOCKED" && fin.reasons.some((r) => r.includes("fleet not OK")), fin);
@@ -283,14 +301,14 @@ const files = (f, runId) => existsSync(join(f.ev, "runs", runId)) ? readdirSync(
 {
   const f = fixture({ auth: AUTH("T010"), cards: [{ id: "T010", phase: 1 }, { id: "T900", phase: 8 }] });
   rs(f, "init");
-  ship(f, "T010", realCommit(f));
+  ship(f, "T010");
   const fin = rs(f, "finish");
   check("8e. a gated Phase 8 card keeps the success marker unreachable", fin.outcome === "BLOCKED" && fin.reasons.some((r) => r.includes("not verified done")), fin);
 }
 {
   const f = fixture({ auth: AUTH("T010 and T011"), cards: [{ id: "T010", phase: 1 }, { id: "T011", phase: 1 }] });
   rs(f, "init");
-  ship(f, "T010", realCommit(f));
+  ship(f, "T010");
   rs(f, "start", "T011");
   rs(f, "block", "T011", "--reason", "r", "--needs", "n");
   const fin = rs(f, "finish");

@@ -48,8 +48,11 @@ if (cmd !== "report" && cmd !== undefined) {
   const take = () => { const fd = openSync(lock, "wx"); writeFileSync(fd, `${process.pid} ${Date.now()}\n`); closeSync(fd); };
   try { take(); } catch (e) {
     if (e.code !== "EEXIST") throw e;
-    if (Date.now() - statSync(lock).mtimeMs < 120000) { console.log(JSON.stringify({ ok: false, error: "another process is writing this run; retry once it finishes" })); process.exit(1); }
-    unlinkSync(lock); take();
+    let age = 0;
+    try { age = Date.now() - statSync(lock).mtimeMs; } catch { age = Infinity; } // the lock vanished between EEXIST and stat: retry below
+    if (age < 120000) { console.log(JSON.stringify({ ok: false, error: "another process is writing this run; retry once it finishes" })); process.exit(1); }
+    try { unlinkSync(lock); } catch { /* released meanwhile */ }
+    take();
   }
   process.on("exit", () => { try { unlinkSync(lock); } catch { /* already gone */ } });
 }
@@ -106,6 +109,10 @@ function decide(r, st) {
   const doneHere = new Set(r.completed.map((c) => c.task));
   const parkedNow = () => new Set(r.blocked.map((b) => b.task));
   if (r.current && (doneHere.has(r.current.task) || isDoneInState(st, r.current.task))) { r.current = null; }
+  if (r.current && r.deliveries.some((d) => d.tasks.includes(r.current.task))) {
+    const d = r.deliveries.find((x) => x.tasks.includes(r.current.task));
+    return { action: "record-done", task: r.current.task, sha: d.sha, call: `run-state.mjs done ${r.current.task} --evidence "<counts>" --sha ${d.sha}`, note: "delivered; record it, fast-forward this checkout to origin/main, then next" };
+  }
   if (r.current) {
     const cs = st.tasks[r.current.task];
     if (cs && (cs.status === "done" || cs.status === "done-pending-tick")) r.current = null; // finished elsewhere: never redone
@@ -135,6 +142,8 @@ function completion(r, st) {
   const eligible = st.queue.filter((q) => !r.completed.some((c) => c.task === q.id));
   if (eligible.length) reasons.push(`eligible tasks remain: ${eligible.map((q) => q.id).join(", ")}`);
   if (!r.deliveries.length) reasons.push("no verified delivery to main is recorded");
+  if (gitQuiet("diff", "--quiet", "origin/main", "--", "specs/002-p0-prd/tasks.md") === null) reasons.push("this checkout's tasks.md differs from origin/main (fast-forward first): completion is judged on the delivered file");
+  if (st.parkedPhases.length) reasons.push(`Phases parked on the owner: ${st.parkedPhases.join(", ")}`);
   const tip = gitQuiet("rev-parse", "origin/main");
   if (!tip) reasons.push("origin/main is not resolvable (fetch first)");
   else {
@@ -161,6 +170,7 @@ function blockedReport(r, st, why) {
     ...(c.authorizedTasksWaitingOnGates.length ? ["Authorized tasks waiting only on gates:", ...c.authorizedTasksWaitingOnGates.map((t) => `- ${t.id}: ${t.gates.join(", ")}`)] : []),
     ...(r.blocked.length ? ["Run-level parked tasks and the exact decision each needs:", ...r.blocked.map((b) => `- ${b.task}: ${b.needs}`)] : []),
     ...(c.excluded.length ? ["Not requestable yet:", ...c.excluded.map((e) => `- ${e.id}: ${e.why}`)] : []), "");
+  if (st.parkedPhases.length) L.push("## Phases parked on the owner", ...st.parkedPhases.map((x) => `- ${x}`), "");
   L.push(`Totals: ${st.totals.done}/${st.totals.cards} cards done; ${st.totals.candidates} eligible; ${st.totals.blocked} not done.`, "");
   return L.join("\n");
 }
@@ -175,7 +185,7 @@ if (cmd === "init") {
     const runId = flag("--run-id") || `wanees-${ts}-${randomBytes(4).toString("hex")}`;
     if (!RUN_ID.test(runId)) fail("--run-id must match wanees-<yyyymmddThhmmssZ>-<8 hex>");
     if (existsSync(runFile(runId))) fail(`run ${runId} already exists; init without --run-id adopts the unfinished run`);
-    r = { schema: "wanees-run.v1", runId, startedAt: now(), finished: null, current: null, completed: [], blocked: [], deliveries: [], checkpoints: [] };
+    r = { schema: "wanees-run.v1", runId, startedAt: now(), baseMain: gitQuiet("rev-parse", "origin/main"), finished: null, current: null, completed: [], blocked: [], deliveries: [], checkpoints: [] };
     // A leftover generic marker is renamed (never deleted) so it can never trigger shutdown for this run.
     const generic = join(EVIDENCE_ROOT, "PHASE-COMPLETE.flag");
     if (existsSync(generic)) renameSync(generic, `${generic}.stale-${ts}`);
@@ -207,7 +217,8 @@ if (cmd === "start") {
   if (c.status === "done" || c.status === "done-pending-tick") out({ task: id, note: "already done; nothing to start", skipped: true });
   if (r.blocked.some((b) => b.task === id)) fail(`${id} is parked; unblock it first`);
   if (c.status !== "candidate") fail(`${id} is not eligible (${c.status}): ${c.why || ""}`);
-  if (!r.current) { r.current = { task: id, phase: c.phase, since: now() }; r.checkpoints.push({ at: now(), event: "start", task: id }); save(r); }
+  if (r.current && r.current.session && flag("--session") && r.current.session !== flag("--session")) fail(`${id} is held by another session`);
+  if (!r.current) { r.current = { task: id, phase: c.phase, since: now(), ...(flag("--session") ? { session: flag("--session") } : {}) }; r.checkpoints.push({ at: now(), event: "start", task: id }); save(r); }
   out({ task: id, phase: c.phase, current: r.current });
 }
 if (cmd === "done") {
@@ -216,7 +227,6 @@ if (cmd === "done") {
   if (!evidence || !evidence.trim()) fail("--evidence is required: a task is done only with recorded acceptance evidence");
   const doneSha = flag("--sha");
   if (!r.completed.some((x) => x.task === id)) {
-    if (!r.current || r.current.task !== id) fail(`${id} was not started in this run (start it first)`);
     if (!r.deliveries.some((d) => d.sha === doneSha && d.tasks.includes(id))) fail(`${id} has no recorded delivery with --sha ${doneSha}: done is recorded only after verification, review and delivery`);
   }
   const st = status();
@@ -253,11 +263,23 @@ if (cmd === "deliver") {
   if (!tasks.length) fail("--tasks is required");
   if (!flag("--ci") || !flag("--ci").trim()) fail("--ci is required: the URL or id of the green verify run on this exact sha");
   if (tasks.some((t) => !r.current || r.current.task !== t) && !tasks.every((t) => r.completed.some((x) => x.task === t))) fail(`deliver covers only the task in progress (${r.current ? r.current.task : "none"}); the loop is serial`);
+  if (!r.deliveries.some((d) => d.sha === sha)) {
+    // Verified, not merely well-formed (read-only Git): a real commit, now on origin/main, newer than the run's base and than every earlier
+    // delivery, whose tasks.md carries the [x] of every listed task.
+    if (gitQuiet("cat-file", "-e", `${sha}^{commit}`) === null) fail(`${sha} is not a commit in this repository (fetch first)`);
+    if (gitQuiet("merge-base", "--is-ancestor", sha, "origin/main") === null) fail(`${sha} is not on origin/main: push it fast-forward first`);
+    const older = [r.baseMain, ...r.deliveries.map((d) => d.sha)].filter(Boolean);
+    const stale = older.find((o) => gitQuiet("merge-base", "--is-ancestor", sha, o) !== null);
+    if (stale) fail(`${sha} is not newer than ${stale.slice(0, 12)} (the run base or an earlier delivery); a delivery must be a new commit`);
+    const tm = gitQuiet("show", `${sha}:specs/002-p0-prd/tasks.md`) || "";
+    const unticked = tasks.filter((t) => !new RegExp(`^- \\[[xX]\\] ${t}\\b`, "m").test(tm.replace(/\r\n/g, "\n")));
+    if (unticked.length) fail(`tasks.md at ${sha.slice(0, 12)} has no [x] for ${unticked.join(", ")}: the delivered commit must tick the task`);
+  }
   if (!r.deliveries.some((d) => d.sha === sha)) r.deliveries.push({ sha, tasks, ...(flag("--ci") ? { ci: flag("--ci") } : {}), at: now() });
   for (const c of r.completed) if (tasks.includes(c.task) && !c.sha) c.sha = sha;
   r.checkpoints.push({ at: now(), event: "deliver", sha });
   save(r);
-  out({ delivered: sha, tasks, note: "delivery recorded; select the next task immediately (run-state.mjs next)" });
+  out({ delivered: sha, tasks, note: `delivery recorded; now: run-state.mjs done ${tasks[0]} --evidence "<counts>" --sha ${sha}, then fast-forward this checkout to origin/main, then next` });
 }
 if (cmd === "report") {
   const st = status();

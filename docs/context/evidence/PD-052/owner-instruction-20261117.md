@@ -1,4 +1,6 @@
-# Owner instruction (verbatim), 2026-11-17
+# Owner instruction (verbatim opening + condensed requirement list), 2026-11-17
+
+The first three paragraphs below are verbatim; the numbered requirement list is a faithful condensation (headings as written by the owner) and the closing sentence is verbatim. The owner's message named model Claude Opus 5.5 High; this implementation was authored by a Sonnet 5.5 session and reviewed by the Opus 5.5 High `migration-review` lane (owner confirmation of that deviation and of the Proposed mechanics is requested in the run report).
 
 Source: the project owner's message to the orchestrator session, 2026-11-17. Recorded for PD-052.
 

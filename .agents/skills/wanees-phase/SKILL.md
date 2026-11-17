@@ -57,6 +57,8 @@ LOOP
 - *"Report progress after each task"*: `run-state done` plus `log.md`, never a chat stop.
 - *Completion checkbox*: `[x]` in `tasks.md` is part of the delivery commit, after the task's evidence is recorded.
 
+**Recording order after a delivery.** `run-state deliver` verifies the commit read-only (a real commit, on `origin/main`, newer than the run base and every earlier delivery, with the task's `[x]` in its `tasks.md`). If the session is interrupted between `deliver` and `done`, `next` returns `record-done`: record it, never redo or park it.
+
 **Delivery per task, serial.** The loop runs one task at a time (`run-state` keeps a single in-progress task). Implement and deliver each task in its own `deliver/<slug>` worktree created from the latest `origin/main` (§7.3), so edits of a parked or failed task stay in its own worktree and never reach the next task's tree. Do not hold finished work until a Phase closes. `feat/wanees-phase-<n>` is a label for Phase state, not a required unit of delivery. Order is fixed: delivery (green `verify` on the exact SHA, fast-forward push) → `run-state deliver` → `run-state done` (refused before a recorded delivery) → fast-forward this checkout to `origin/main` → `next`. `phase-status.mjs` counts a card done only with the `[x]` in this checkout's `tasks.md` plus the evidence; a card with evidence but no local tick is `done-pending-tick` and is never re-queued, and its dependants wait. A delivered task cannot be parked.
 
 ## Hard rules (never relaxed by this skill)
@@ -165,9 +167,9 @@ This entry evidence satisfies the gates for T001 only. Any other card that names
 
 **`next.action`.** It takes the first of these that applies:
 1. `stop`: the fleet is not OK, or a saved state is unreadable (environment faults; `run-state.mjs` turns them into a BLOCKED report, not a retry loop).
-2. `resume`: a saved Phase is in a non-terminal stage (not `merged`, `blocked` or `tracking`).
+2. `resume`: a saved Phase is in an in-flight stage (not `merged`, `blocked`, `awaiting-owner`, `pr-open` or `tracking`).
 3. `run-phase`: carries the whole-graph `queue`.
-4. `blocked`: carries `consolidatedApproval` (the single owner request) and `blockers` (each not-done card with the exact approval or dependency it needs).
+4. `blocked`: carries `consolidatedApprovalRequest` (the single owner request, grants nothing) and `blockers` (each not-done card with the exact approval or dependency it needs).
 
 A saved Phase in a non-terminal stage (not `merged`, `blocked` or `tracking`) is resumed first, then the loop continues. A `blocked` Phase is parked and never stops selection.
 
@@ -197,6 +199,8 @@ Redo only what reality contradicts, and say why.
 5. Record the results in `log.md`.
 
 ## 3. Branch and baseline
+
+**Under the §0 run loop** the branch and baseline are the per-task delivery worktree of §7.3, created from the latest `origin/main` (which already carries `specs/002-p0-prd/`). A file the task must commit that is untracked or absent in that base blocks the task (`run-state block`, needs: how the baseline lands); it is never folded silently into a delivery. The Phase-branch procedure below applies only to a Phase run by hand.
 
 **Inspect first:** run `git status`, `git branch -a` and check existing PRs. Branch only from `main`.
 
@@ -244,7 +248,7 @@ The `tests`, `complex-fix`, `bugfix`, `refactor`, `migrations` and `fast` lanes 
    - "stop and report on any STOP condition".
 3. **Pre-snapshot.** Copy each allowed file and record its SHA-256 under `runs/<task>-<k>/pre/`. Files that do not exist yet are recorded as absent.
 4. **Dispatch** through the user-level relays, in the background:
-   - `node "$HOME/.claude/skills/agy-delegate/scripts/relay.mjs" --brief "<brief>" --cd . --lane implementation --out-dir ".scratch/wanees-phases/phase-<n>/runs/<task>-<k>"`
+   - `node "$HOME/.claude/skills/agy-delegate/scripts/relay.mjs" --brief "<brief>" --cd . --lane implementation --out-dir "<primary checkout>/.scratch/wanees-phases/phase-<n>/runs/<task>-<k>" (absolute path in the primary checkout, so run output never lands in the task worktree)`
    - `node "$HOME/.claude/skills/claude-delegate/scripts/relay.mjs" --brief "<brief>" --cd . --lane ui --out-dir "…"`
 
    Do not pass `--dangerously-skip-permissions`. If headless agy denies a write, record the denial and `block` the task with needs "owner: allow --dangerously-skip-permissions for <T>". Never add it on your own.
@@ -287,7 +291,7 @@ Label the environment of each result, for example "Windows host".
 - each card's own acceptance and security checks;
 - for storage, migration, RLS, auth, lease or tenant changes: Linux + PG17 runs of `tenant-isolation-live`, PostgreSQL storage tenant isolation and `postgres-lease-conformance`, with zero skipped mandatory tests. Windows results never substitute for these.
 
-A required check that was skipped or failed blocks the Phase. Never report a skipped PostgreSQL test as passing.
+A required check that was skipped or failed blocks the task (and its Phase). Never report a skipped PostgreSQL test as passing.
 
 ## 6. Independent Phase review (G02 author→reviewer table)
 

@@ -179,7 +179,7 @@ for (const m of statusBlock.matchAll(/\*\*Implementation authorization( revoked)
   (m[1] ? revocations : authorizations).push({ date: m[2], ...(m[3] ? { batch: m[3] } : {}), tasks: [...new Set(list.match(/\bT\d{3}\b/g))] });
 }
 // Fail closed: a line that says "authorization revoked" but did not parse as a revocation blocks every candidate until restated.
-const revocationMentions = (statusBlock.match(/Implementation authorization revoked/g) || []).length;
+const revocationMentions = statusBlock.split("\n").filter((l) => /authori[sz]ation\b.*\brevoked\b|\brevok(e|ed|ing)\b.*\bauthori[sz]ation/i.test(l)).reduce((n, l) => n + Math.max(1, (l.match(/Implementation authorization revoked/g) || []).length), 0);
 const revocationFault = revocationMentions > revocations.length;
 if (revocationFault) warnings.push(`${revocationMentions - revocations.length} authorization revocation line(s) did not parse: every candidate is blocked until the owner restates them`);
 const revoked = new Set(revocations.flatMap((a) => a.tasks));
