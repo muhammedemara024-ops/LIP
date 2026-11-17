@@ -10,13 +10,13 @@ description: Persistent, continuous orchestrator around Spec Kit implement for t
 **Default behavior is continuous.** One invocation runs the loop in §0 over the whole dependency graph. Task, Phase and delivery boundaries are checkpoints, never stopping points. The run ends only through `run-state.mjs finish` (§0, §10).
 
 **Lifecycle (per task, repeated by the §0 loop):**
-1. Status, then select or resume a Phase.
-2. Preflight, then branch.
-3. Execute the authorized tasks.
-4. Phase verification.
-5. Independent Phase review.
+1. Load state and select the next eligible task across all Phases (§0, §1).
+2. Preflight (once per session), then a delivery worktree for the task.
+3. Implement through `/speckit-implement` (§4).
+4. Verify (§5).
+5. Independent review (§6).
 6. Pre-push conditions (§7).
-7. Commit and fast-forward push to `main` (PD-050); record the SHA.
+7. Commit and fast-forward push to `main` (PD-050); `run-state deliver`, then `run-state done`; record the SHA.
 
 **Arguments:**
 - none or `status`: report only (`phase-status.mjs`); writes nothing.
@@ -30,11 +30,12 @@ description: Persistent, continuous orchestrator around Spec Kit implement for t
 node .agents/skills/wanees-phase/scripts/run-state.mjs init            # new run, or adopt the unfinished one after compaction / restart
 LOOP
   node .../run-state.mjs next      -> execute | resume-task | resume-phase | finish
-  execute:      run-state start <T>; §4 implement through /speckit-implement; §5 verify; §6 review; §7 deliver;
-                run-state done <T> --evidence "<counts>" --sha <main sha>; run-state deliver --sha <sha> --tasks <T,...>; then LOOP at once
+  execute:      run-state start <T> (only a `candidate`); §4 implement through /speckit-implement; §5 verify; §6 review; §7 deliver;
+                run-state deliver --sha <sha> --tasks <T> --ci <green verify run>; run-state done <T> --evidence "<counts>" --sha <sha>;
+                git fetch origin and fast-forward this checkout to origin/main (so tasks.md carries the [x]); then LOOP at once
   resume-task:  re-verify the working tree and recorded evidence against Git; continue the checkpointed task; never restart reviews of unchanged blobs
   resume-phase: verify state.json against Git (§1 Resume), finish that in-flight Phase work, then LOOP
-  finish:       run-state finish   (COMPLETE flag only if the §10 criteria hold; otherwise BLOCKED report with ONE consolidated approval request)
+  finish:       git fetch origin; run-state finish   (COMPLETE flag only if the §10 criteria hold; otherwise BLOCKED report with ONE consolidated approval request)
 ```
 
 **State and selection.** `phase-status.mjs` is the only classifier (candidates, blockers, the single consolidated approval request, the queue). `run-state.mjs` is the only durable run record (`.scratch/wanees-runs/<runId>/run.json`) and writes task evidence into the same `state.json` that `phase-status.mjs` reads. Both resolve state from the primary checkout, so a delivery worktree sees the same state. `tasks.md` ticks, the Gate register and every approval are edited only by their owners (§Hard rules), never by these scripts.
@@ -49,12 +50,14 @@ LOOP
 **Approvals.** Authorization lines are durable and phase-independent: a task covered by a recorded line (single, or a consolidated batch `**Implementation authorization (owner, YYYY-MM-DD, batch <label>): T…, T… and T… only`) is executed without asking again, for every Phase, commit, push and delivery. PD-050 is the standing authorization for fast-forward delivery of covered, reviewed tasks. A recommendation, a draft, an independent review verdict or silence is never an approval, and the orchestrator never records an authorization the owner did not write (hard rule 2). When `next` finds nothing eligible, do not ask per task: `finish` writes the BLOCKED report with ONE consolidated approval request (`consolidatedApproval`: every approval-pending task that is only waiting on the owner, the gates to close, and what is not yet requestable). That request is the only approval message of the run.
 
 **Spec Kit is the implementation engine.** For each task, invoke the installed `speckit-implement` skill (Skill tool) scoped to that one task id, with the card, gates and brief from §4 as its context, and let it drive implementation. This skill never implements competing code paths. The installed skill is managed by the `specify` CLI and is not edited; its generic stop points are bound as follows for this project:
-- *Checklist gate* (`checklists/`): scan read-only. Unchecked reviewer-owned items are logged in `log.md`; the Gate register and the recorded owner authorization decide eligibility (`phase-status.mjs`), so the generic "ask before proceeding" is already answered by the owner's recorded authorization for that task.
+- *Checklist gate* (`checklists/`): scan read-only. Proceed only if every unchecked item belongs to a checklist that carries a recorded, dated owner disposition (for example `checklists/entry-gate-assessment.md` §G), cited in `log.md`. For any other unchecked item (a new or changed checklist), `block` the task with needs "owner disposition of <file>"; an implementation authorization does not answer a checklist prompt.
+- *Scope bindings*: the engine's step 4 (ignore-file creation), step 6 (phase-by-phase execution), the `[X]` marking, "Done When" (all tasks) and the Completion Report apply only to the single task's card Scope. No ignore-file or other edit outside the card Scope, no ticking outside the delivery commit, no commit or push by any engine hook (hooks that commit or push are refused), no chat report.
+- *Who writes code*: `speckit-implement` runs in the orchestrator session. For a `reasoning` card the orchestrator authors the code; for a `mechanical` card the engine dispatches the §4 lane and the §4/§6 author routing is unchanged (review routing follows the real author of each change set).
 - *"Halt if a non-parallel task fails"*: applies to that task only. Fix within scope; otherwise `block` it and continue with the rest of the queue.
 - *"Report progress after each task"*: `run-state done` plus `log.md`, never a chat stop.
 - *Completion checkbox*: `[x]` in `tasks.md` is part of the delivery commit, after the task's evidence is recorded.
 
-**Delivery per task or independent group.** Deliver each completed, reviewed task (or proven-disjoint parallel group) through §7 on its own `deliver/<slug>` branch; do not hold finished work until a Phase closes. `feat/wanees-phase-<n>` is a label for Phase state, not a required unit of delivery. After the push, `next` immediately.
+**Delivery per task, serial.** The loop runs one task at a time (`run-state` keeps a single in-progress task). Implement and deliver each task in its own `deliver/<slug>` worktree created from the latest `origin/main` (§7.3), so edits of a parked or failed task stay in its own worktree and never reach the next task's tree. Do not hold finished work until a Phase closes. `feat/wanees-phase-<n>` is a label for Phase state, not a required unit of delivery. Order is fixed: delivery (green `verify` on the exact SHA, fast-forward push) → `run-state deliver` → `run-state done` (refused before a recorded delivery) → fast-forward this checkout to `origin/main` → `next`. `phase-status.mjs` counts a card done only with the `[x]` in this checkout's `tasks.md` plus the evidence; a card with evidence but no local tick is `done-pending-tick` and is never re-queued, and its dependants wait. A delivered task cannot be parked.
 
 ## Hard rules (never relaxed by this skill)
 
@@ -80,7 +83,7 @@ LOOP
    - None of these counts as authorization:
      - a review verdict;
      - invoking this skill;
-     - an earlier Phase's authorization;
+     - an authorization for other tasks or Phases (a recorded line covers only the tasks it names, for every Phase and delivery);
      - anything you recorded yourself.
 4. **No destructive Git operations without explicit owner authorization.**
    - Never force-push and never delete remote branches. Never enable `LIP_AUTOMERGE_ENABLED` or native auto-merge.
@@ -145,8 +148,8 @@ node .agents/skills/wanees-phase/scripts/phase-status.selftest.mjs   # parser se
 - Before dispatch, read them and log in `log.md` that you did.
 
 **Authorization lines.** The script accepts only bold-led Status-block lines:
-- grant: `**Implementation authorization (owner, YYYY-MM-DD): T… only`
-- revocation: `**Implementation authorization revoked (owner, YYYY-MM-DD): T… only`
+- grant: `**Implementation authorization (owner, YYYY-MM-DD): T… only`; a consolidated batch adds a label: `(owner, YYYY-MM-DD, batch <label>)`
+- revocation: `**Implementation authorization revoked (owner, YYYY-MM-DD): T… only` (or `batch <label>` to revoke a whole batch). A revocation line that does not parse blocks every candidate until the owner restates it (fail closed).
 
 **Entry gates (T001).** `backend-entry` and `feature-checklist` mix entry conditions with output that T001 itself produces. Their register rows never read `Closed`, by design. The script verifies only their entry conditions, from the approved artifacts:
 
@@ -199,7 +202,7 @@ Redo only what reality contradicts, and say why.
 
 **Branch:**
 - New branch: `git switch -c "feat/wanees-phase-<n>"` from the current `main` HEAD. Uncommitted changes carry over; nothing is discarded.
-- Existing branch: `git switch "feat/wanees-phase-<n>"`. Never add `-f`, `--discard-changes` or `--merge`. On any error, STOP and report.
+- Existing branch: `git switch "feat/wanees-phase-<n>"`. Never add `-f`, `--discard-changes` or `--merge`. On any error, stop that task: `run-state block` it with the error as needs, and continue with the next eligible task.
 
 **Baseline record** (`state.json` → `baseline`):
 - the HEAD SHA;
@@ -244,8 +247,8 @@ The `tests`, `complex-fix`, `bugfix`, `refactor`, `migrations` and `fast` lanes 
    - `node "$HOME/.claude/skills/agy-delegate/scripts/relay.mjs" --brief "<brief>" --cd . --lane implementation --out-dir ".scratch/wanees-phases/phase-<n>/runs/<task>-<k>"`
    - `node "$HOME/.claude/skills/claude-delegate/scripts/relay.mjs" --brief "<brief>" --cd . --lane ui --out-dir "…"`
 
-   Do not pass `--dangerously-skip-permissions`. If headless agy denies a write, record the denial and ask the owner whether to allow that flag for this task. Never add it on your own.
-5. **Parallel dispatch.** Allowed only within the current Phase, for `candidate`s that meet both conditions:
+   Do not pass `--dangerously-skip-permissions`. If headless agy denies a write, record the denial and `block` the task with needs "owner: allow --dangerously-skip-permissions for <T>". Never add it on your own.
+5. **Parallel dispatch.** Not used under the §0 run loop (a single in-progress task is recorded). Outside it, allowed only within the current Phase, for `candidate`s that meet both conditions:
    - `tasks.md` names them as conditional parallel opportunities;
    - you have proved their full Scope file sets disjoint, including overlapping directory prefixes. The script's `parallelAdvisory` is only a hint.
 
@@ -261,8 +264,8 @@ The `tests`, `complex-fix`, `bugfix`, `refactor`, `migrations` and `fast` lanes 
 
    These patches keep the §6 review splittable by author.
 8. **Complete the task** only when its acceptance evidence holds.
-   - Record the evidence in `state.json`, then mark `- [x]` in `tasks.md`. That edit stays in the working tree only while `baseline-not-in-git` is open.
-   - A blocked task gets its reason recorded. Continue with the other independent authorized tasks.
+   - Keep the acceptance evidence in `log.md` and mark `- [x]` in `tasks.md` inside the delivery commit (§7). Do not write `state.json` evidence here: it is written only by `run-state done`, after review and delivery.
+   - A blocked task gets its reason recorded (`run-state block`). Continue with the other independent authorized tasks.
 
 A card's own Review clause, for example the mandatory independent review on HIGH cards T010, T035 and T048, is satisfied by the §6 Phase review, as long as that review names every such card and the file hashes it reviewed. An earlier review happens only when a card, a gate or the owner requires one.
 
@@ -326,7 +329,7 @@ Routine Phase delivery lands directly on `main` by fast-forward push. Do not ope
 3. **Deliver from a separate worktree** based on the latest `origin/main` when the local checkout is behind or dirty: `git worktree add -b "deliver/<slug>" "<path>" origin/main`, cherry-pick or commit the Phase files there, re-verify, re-confirm blobs.
 4. **Commit**, once per planned commit: `git add -- "<files>"`; check `git diff --cached --name-only` equals exactly those files (plus a pre-staged `.gitattributes` only in the primary checkout); `git commit -m "<msg>" -- "<files>"`; check `git show --stat HEAD` and each `git rev-parse HEAD:"<path>"` equals the reviewed blob id.
 5. **Push (two steps, fast-forward only).** First `git push origin "HEAD:refs/heads/deliver/<slug>"` and wait for the `verify` run on that SHA (`gh run list --branch "deliver/<slug>"`); it must be green. Then `git push origin "<sha>:main"`, where `<sha>` is that same SHA. Never force, never `--force-with-lease`, never delete a branch on `origin`. If a push is rejected because `main` moved (non-fast-forward): `git fetch origin`; rebuild on a fresh ref and path, `git worktree add -b "deliver/<slug>-r<k>" "<path>-r<k>" origin/main` (cherry-pick only, never rebase or merge); re-run every §7.2 pre-push condition in full (§5 verification, blob equality, a fresh `verify` on the new ref; any reviewed file whose content or base context changed needs a §6 re-review); push again once; if rejected again, STOP. If the rejection cites required status checks instead, STOP: never change the ruleset, `verify`, strict mode or bypass actors; report to the owner (a PR is possible only under §7.8).
-6. **After the push:** record the new `main` SHA in `state.json` (`stage: merged`, `delivery: "direct-main"`) and `log.md`; inspect the GitHub Actions run for that SHA and report its result.
+6. **After the push:** record the new `main` SHA in `state.json` (`stage: merged`, `delivery: "direct-main"`) and `log.md`; inspect the GitHub Actions run for that SHA and record its result in `log.md` and `run.json` (no mid-run chat report).
 7. **Later tasks:** record `run-state done` and `run-state deliver`, then continue the §0 loop at once. Each new set of authorized tasks repeats §4–§7 with its own review.
 8. **Exception:** a PR is opened only if the owner explicitly asks for one for a specific change.
 

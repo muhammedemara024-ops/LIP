@@ -2444,7 +2444,9 @@ Consequences:
 Date / approved by:
 ```
 
-## PD-052 — Continuous, persistent Wanees execution workflow; consolidated approval requests — Approved (owner directive, 2026-11-17)
+## PD-052 — Continuous, persistent Wanees execution workflow; consolidated approval requests — Approved in substance by owner directive (2026-11-17); design details Proposed until confirmed
+
+Approval scope: the owner directive (verbatim: `docs/context/evidence/PD-052/owner-instruction-20261117.md`) approves items 1–5 and 7 below in substance (continuous loop, parked blocked tasks, durable consolidated batch authorizations and the single consolidated request, the run-scoped success marker, no weakening of PD-050 or any gate). The mechanics and item 6 (how the generic `speckit-implement` stop points are bound) are orchestrator design and stay **Proposed** until the owner confirms them; item 6 in particular never lets an implementation authorization answer a checklist prompt.
 
 Context: the owner directed on 2026-11-17: "FIX THE WORKFLOW ITSELF … The owner requires continuous Spec Kit implementation across the entire dependency graph." Diagnosis: `phase-status.mjs` returned `resume` for any saved Phase not `merged` (so a Phase with recorded tasks or a blocked Phase wedged selection) and `stop`/`blocked` as terminal actions; selection and state were per Phase and per working tree (a delivery worktree saw no state and no fleet trust); `SKILL.md` ended with "report … then stop", reported on every invocation and treated a Phase as the unit of delivery; there was no run-level record to resume after compaction.
 
@@ -2454,7 +2456,7 @@ Decision:
 3. A recorded implementation authorization, including a labelled consolidated batch (`(owner, YYYY-MM-DD, batch <label>)`), is durable across Phases and deliveries and is never asked for again. PD-050 remains the standing delivery authorization. Recommendations, drafts and review verdicts are never approvals, and the orchestrator never records an authorization the owner did not write.
 4. When no task is eligible, ONE consolidated approval request (every approval-pending task, the gates to close, what is not yet requestable) is written into the BLOCKED report.
 5. The success marker `COMPLETE-<runId>.flag` is written only by `run-state.mjs finish`, only when every card is verified done, nothing is parked or in progress, and every completed task has a recorded delivery. Phase 8 gated tracks keep it unreachable until the owner un-gates them.
-6. `speckit-implement` is the implementation engine and is not edited (managed by the `specify` CLI); its generic stop points are bound in `SKILL.md` §0.
+6. (Proposed) `speckit-implement` is the implementation engine and is not edited (managed by the `specify` CLI); its generic stop points are bound in `SKILL.md` §0: a checklist prompt is answered only by a recorded, dated owner disposition of that checklist, never by an implementation authorization.
 7. No gate, approval, review requirement, Git safety rule or PD-050 delivery condition is weakened.
 
 Consequences: `.agents/skills/wanees-phase/` (SKILL.md, state-schema.md, phase-status.mjs, run-state.mjs and both self-tests), the pointer `.claude/skills/wanees-phase/SKILL.md` and the AGENTS.md §3 row change. No product code, upstream LIP file or contract changes.
