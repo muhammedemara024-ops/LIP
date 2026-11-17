@@ -2411,6 +2411,27 @@ Consequences: `AGENTS.md` §3 table row and §8, rule 04 item 5 and `.agents/ski
 
 Date / approved by: 2026-11-16, project owner.
 
+## PD-051 — Batch 2 design decisions D1-D8 and T006/T007/T012/T013 authorization (conditional) — Approved (2026-11-17)
+
+Context: the owner issued the "Batch 2 Consolidated Decisions" on 2026-11-17 in response to `.scratch/batch2-drafts/consolidated-approval-proposal.md` (verbatim text recorded in the Wanees session of that date).
+
+Decision:
+1. **D1 (Approved).** Generate a complete per-column schema manifest and a per-table RLS policy matrix from the approved data model (`specs/002-p0-prd/data-model.md` §§1-4). Independent review and explicit validation of the resulting manifest are required before any schema implementation.
+2. **D2 (Approved).** PostgreSQL `gen_random_uuid()` for directory UUID keys. Explicitly specified ULID text representations are preserved.
+3. **D3 (Approved).** Migration tables are schema-qualified in their owning schemas (`bff`, `directory`) with a pinned secure migrator `search_path`.
+4. **D4 (Approved as a rejection).** Not every LIP HTTP 500 is a definite refusal. Potentially committed accrual operations are uncertain until reconciliation. Recovery never creates a second business operation and never changes the idempotency key. (This replaces the proposal's "retry with the same key" recommendation.)
+5. **D5 (Approved).** BFF-side balance synchronization before reservation cancellation or re-reservation, subject to verified concurrency and expiry behavior.
+6. **D6 (Not approved).** Journal lease, dispatch-timeout and `source.system` values remain unselected. Evidence-based proposals only.
+7. **D7 (Approved).** BFF enforcement prevents accrual at inactive locations, verifying authorization and location state at the appropriate operation boundary.
+8. **D8 (Not approved).** T009 stays blocked. A benchmark input worksheet with sourced values and marked unknowns is prepared; no invented load assumptions or unauthorized staging access.
+9. **Authorization.** Gate 2 content approval and implementation authorization for T006, T007, T012 and T013 only to the extent their existing reviewed scopes and entry conditions are fully satisfied by the decisions above. Portions depending on the unvalidated D1 manifest, on D6 constants or on other unresolved gates do not begin. T009 remains blocked.
+
+Consequences: no existing Approved decision changes. D4 supersedes the Proposed text in `.scratch/batch2-drafts/journal-execution-brief.md`. The authorization is conditional and per-task; it is not a gate waiver.
+
+Date / approved by: 2026-11-17, project owner.
+
+---
+
 ---
 
 Template for new entries:

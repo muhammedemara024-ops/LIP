@@ -517,6 +517,8 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
     const db = new Client({ connectionString: database.url });
     await db.connect();
     try {
+      // Tenant tables are FORCE RLS: scope this session to the cafe so the helper also works for a non-superuser URL.
+      await db.query("SELECT set_config('lip.tenant_id', $1, false)", [cafe().cafe.tenantId]);
       return (await db.query<T>(text, values)).rows;
     } finally {
       await db.end();
@@ -546,8 +548,10 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
     expect(await idempotencyRows()).toBe(rowsBefore);
 
     // A successful balance-computing call commits the expiry together with its own idempotency record.
-    await balances(member); // GET-style read through a mutating route
+    await balances(member); // read through a mutating route
     expect(await stored()).toBe("expired");
+    // The expiry is committed together with that call's own idempotency record.
+    expect(await idempotencyRows()).toBe(rowsBefore + 1);
   });
 
   it("commits a queued write after the client gave up: the write waits on the per-program lock and still lands (R-07 late commit, executed)", async () => {
@@ -585,10 +589,20 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
           () => "aborted" as const
         );
         const outcome = await Promise.race([pending, sleep(1500).then(() => "pending" as const)]);
+        if (outcome !== "pending" && outcome !== "aborted") {
+          // Only a spurious authenticate 500 may answer at once; anything else is a real failure.
+          expect((outcome as Response).status).toBe(500);
+        }
         if (outcome === "pending") {
-          parked = true;
-          controller.abort(); // the client gives up
-          expect(await pending).toBe("aborted");
+          const waiting = await sql<{ n: string }>("SELECT count(*) AS n FROM pg_locks WHERE locktype = 'advisory' AND NOT granted");
+          if (Number(waiting[0]!.n) > 0) {
+            parked = true; // the request is queued on the engine lock
+            controller.abort(); // the client gives up
+            expect(await pending).toBe("aborted");
+          } else {
+            controller.abort();
+            await pending;
+          }
         }
       }
       expect(parked).toBe(true);
@@ -609,9 +623,9 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
     }
     // A same-body retry replays and creates no second points entry.
     let status = 500;
-    for (let i = 0; i < 12 && status === 500; i += 1) {
+    for (let i = 0; i < 12 && (status === 500 || status === 429); i += 1) {
       status = (await send()).status;
-      if (status === 500) await sleep(250);
+      if (status === 500 || status === 429) await sleep(250);
     }
     expect(status).toBeLessThan(300);
     const points = await sql<{ n: string }>("SELECT count(*) AS n FROM lip_engine_ledger WHERE tenant_id = $1 AND program_id = $2 AND order_id = $3 AND unit = 'points'", [cafe().cafe.tenantId, programId(), orderId]);
