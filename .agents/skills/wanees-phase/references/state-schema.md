@@ -43,7 +43,7 @@ File: `.scratch/wanees-phases/phase-<n>/state.json`. It is untracked. Write it a
 
 **Stages that never gate selection.** `merged` (delivered), `blocked` (parked Phase) and `tracking` (evidence ledger written by `run-state.mjs`, holding no in-flight Phase work) never force `resume`. Every other stage means in-flight Phase work that must be verified against Git and finished first.
 
-**Run record** (`.scratch/wanees-runs/<runId>/run.json`, written only by `run-state.mjs`): `{ schema: "wanees-run.v1", runId, startedAt, finished, current: {task, phase, since} | null, completed: [{task, phase, evidence, sha?}], blocked: [{task, reason, needs}], deliveries: [{sha, tasks, ci?}], checkpoints: [] }`. Task evidence itself is written into the Phase `state.json` below.
+**Run record** (`.scratch/wanees-runs/<runId>/run.json`, written only by `run-state.mjs`): `{ schema: "wanees-run.v1", runId, startedAt, baseMain (origin/main at init; every delivery must be newer), finished, current: {task, phase, since, session?} | null, completed: [{task, phase, evidence, sha?}], blocked: [{task, reason, needs}], deliveries: [{sha, tasks, ci?}], checkpoints: [] }`. `next` actions: `execute`, `resume-task`, `record-delivery` (the [x] is present but no delivery is recorded), `record-done` (a delivery is recorded, `done` is not), `resume-phase`, `finish`. Task evidence itself is written into the Phase `state.json` below.
 
 **Rules**
 

@@ -265,6 +265,27 @@ const files = (f, runId) => existsSync(join(f.ev, "runs", runId)) ? readdirSync(
   check("7. M8 recorded-done without a local tick is done-pending-tick, never a candidate again", st.tasks.T010.status === "done-pending-tick" && st.queue.length === 0, st.tasks.T010);
 }
 
+// 7b. N3: interrupted after the push but before deliver; L17/L18/L15 guards.
+{
+  const f = fixture({ auth: AUTH("T010 and T011"), cards: [{ id: "T010", phase: 1 }, { id: "T011", phase: 1 }] });
+  rs(f, "init");
+  rs(f, "start", "T010");
+  const sha = commitTick(f, "T010"); // pushed; this tree now carries the [x]
+  const n = rs(f, "next");
+  check("7b. N3 after the push, before deliver: next says record-delivery and does not park", n.action === "record-delivery" && n.task === "T010" && rs(f, "report").run.blocked.length === 0, n);
+  check("7b. N3 deliver and done then succeed", rs(f, "deliver", "--sha", sha, "--tasks", "T010", "--ci", CI).ok === true && rs(f, "done", "T010", "--evidence", "e", "--sha", sha).ok === true);
+  rs(f, "start", "T011");
+  const sha2 = commitTick(f, "T011");
+  rs(f, "deliver", "--sha", sha2, "--tasks", "T011", "--ci", CI);
+  check("7b. L17 a delivered task cannot be parked before done", rs(f, "block", "T011", "--reason", "r", "--needs", "n").ok === false);
+  check("7b. L18 re-delivering a recorded sha for a different task set is refused", rs(f, "deliver", "--sha", sha2, "--tasks", "T010", "--ci", CI).ok === false);
+}
+{
+  const f = fixture({ auth: AUTH("T010"), cards: [{ id: "T010", phase: 1 }] });
+  execFileSync("git", ["update-ref", "-d", "refs/remotes/origin/main"], { cwd: f.dir });
+  check("7b. L15 init without a resolvable origin/main is refused", rs(f, "init").ok === false);
+}
+
 // 8. Partial completion never writes a success marker; full completion does, only for a verified delivery.
 {
   const f = fixture({ auth: AUTH("T010 and T011"), cards: [{ id: "T010", phase: 1 }, { id: "T011", phase: 1 }] });

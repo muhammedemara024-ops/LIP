@@ -45,16 +45,18 @@ const RUN_ID = /^wanees-\d{8}T\d{6}Z-[0-9a-f]{8}$/;
 if (cmd !== "report" && cmd !== undefined) {
   mkdirSync(RUNS, { recursive: true });
   const lock = join(RUNS, ".lock");
-  const take = () => { const fd = openSync(lock, "wx"); writeFileSync(fd, `${process.pid} ${Date.now()}\n`); closeSync(fd); };
+  const nonce = randomBytes(8).toString("hex");
+  const take = () => { const fd = openSync(lock, "wx"); writeFileSync(fd, `${nonce} ${process.pid} ${Date.now()}\n`); closeSync(fd); };
   try { take(); } catch (e) {
     if (e.code !== "EEXIST") throw e;
     let age = 0;
     try { age = Date.now() - statSync(lock).mtimeMs; } catch { age = Infinity; } // the lock vanished between EEXIST and stat: retry below
     if (age < 120000) { console.log(JSON.stringify({ ok: false, error: "another process is writing this run; retry once it finishes" })); process.exit(1); }
     try { unlinkSync(lock); } catch { /* released meanwhile */ }
-    take();
+    try { take(); } catch { console.log(JSON.stringify({ ok: false, error: "another process took the run lock; retry" })); process.exit(1); }
   }
-  process.on("exit", () => { try { unlinkSync(lock); } catch { /* already gone */ } });
+  // Release only a lock this process still owns (a stale-replaced lock now belongs to another process).
+  process.on("exit", () => { try { if (readFileSync(lock, "utf8").startsWith(nonce)) unlinkSync(lock); } catch { /* already gone */ } });
 }
 const fail = (msg, extra = {}) => { console.log(JSON.stringify({ ok: false, error: msg, ...extra }, null, 2)); process.exit(1); };
 const out = (o) => { console.log(JSON.stringify({ ok: true, ...o }, null, 2)); process.exit(0); };
@@ -112,6 +114,10 @@ function decide(r, st) {
   if (r.current && r.deliveries.some((d) => d.tasks.includes(r.current.task))) {
     const d = r.deliveries.find((x) => x.tasks.includes(r.current.task));
     return { action: "record-done", task: r.current.task, sha: d.sha, call: `run-state.mjs done ${r.current.task} --evidence "<counts>" --sha ${d.sha}`, note: "delivered; record it, fast-forward this checkout to origin/main, then next" };
+  }
+  if (r.current && st.tasks[r.current.task]?.status === "done-unverified") {
+    // The [x] is already in this tree: the delivery commit may be on origin/main although deliver was not recorded. Never park it.
+    return { action: "record-delivery", task: r.current.task, note: `[x] is present for ${r.current.task}: if its commit is on origin/main run: run-state.mjs deliver --sha <sha> --tasks ${r.current.task} --ci <green verify run>, then done; if it was never pushed, block it` };
   }
   if (r.current) {
     const cs = st.tasks[r.current.task];
@@ -182,6 +188,7 @@ if (cmd === "init") {
   const resumed = !!r;
   if (!r) {
     const ts = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+    if (!gitQuiet("rev-parse", "origin/main")) fail("origin/main is not resolvable: git fetch origin first");
     const runId = flag("--run-id") || `wanees-${ts}-${randomBytes(4).toString("hex")}`;
     if (!RUN_ID.test(runId)) fail("--run-id must match wanees-<yyyymmddThhmmssZ>-<8 hex>");
     if (existsSync(runFile(runId))) fail(`run ${runId} already exists; init without --run-id adopts the unfinished run`);
@@ -196,6 +203,7 @@ if (cmd === "init") {
 }
 
 const r = activeRun();
+const sessionGuard = () => { if (r.current && r.current.session && flag("--session") && r.current.session !== flag("--session")) fail(`the in-progress task is held by another session`); };
 const requireTask = () => positional || fail("task id required");
 
 if (cmd === "next") {
@@ -223,6 +231,7 @@ if (cmd === "start") {
 }
 if (cmd === "done") {
   const id = requireTask();
+  sessionGuard();
   const evidence = flag("--evidence");
   if (!evidence || !evidence.trim()) fail("--evidence is required: a task is done only with recorded acceptance evidence");
   const doneSha = flag("--sha");
@@ -242,7 +251,8 @@ if (cmd === "done") {
 }
 if (cmd === "block") {
   const id = requireTask();
-  if (r.completed.some((x) => x.task === id)) fail(`${id} is already done and delivered; a delivered task cannot be parked`);
+  sessionGuard();
+  if (r.completed.some((x) => x.task === id) || r.deliveries.some((d) => d.tasks.includes(id))) fail(`${id} is delivered; a delivered task cannot be parked (record it with done)`);
   const reason = flag("--reason"), needs = flag("--needs");
   if (!reason || !needs) fail("--reason and --needs are required (the exact approval or fix that unblocks it)");
   if (!r.blocked.some((b) => b.task === id)) r.blocked.push({ task: id, reason, needs, at: now() });
@@ -261,6 +271,9 @@ if (cmd === "deliver") {
   const sha = flag("--sha"), tasks = (flag("--tasks") || "").split(",").map((s) => s.trim()).filter(Boolean);
   if (!/^[0-9a-f]{40}$/.test(sha || "")) fail("--sha must be a full 40-hex commit id");
   if (!tasks.length) fail("--tasks is required");
+  sessionGuard();
+  const known = r.deliveries.find((d) => d.sha === sha);
+  if (known && (known.tasks.length !== tasks.length || !tasks.every((t) => known.tasks.includes(t)))) fail(`${sha.slice(0, 12)} is already recorded for ${known.tasks.join(", ")}, not ${tasks.join(", ")}`);
   if (!flag("--ci") || !flag("--ci").trim()) fail("--ci is required: the URL or id of the green verify run on this exact sha");
   if (tasks.some((t) => !r.current || r.current.task !== t) && !tasks.every((t) => r.completed.some((x) => x.task === t))) fail(`deliver covers only the task in progress (${r.current ? r.current.task : "none"}); the loop is serial`);
   if (!r.deliveries.some((d) => d.sha === sha)) {
