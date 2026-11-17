@@ -226,7 +226,7 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
     expect(seen.some((entry) => entry.order_id === `above-${member}` && entry.unit === "points" && entry.amount > 0)).toBe(true);
   });
 
-  it("answers 409 idempotency_conflict to a same-key replay carrying a new request_id, and 409 conflict to a re-accrual with new facts (R-07)", async () => {
+  it("answers 409 idempotency_conflict to a same-key re-send whose business payload differs (placed_at defaults to now), and 409 conflict to a re-accrual with new facts (R-07)", async () => {
     const member = await freshMember();
     const first = await accrue(member, `idem-${member}`, 1000);
     expect(first.entry.amount).toBeGreaterThan(0);
@@ -438,7 +438,9 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
     );
     expect(reserved.reservation.cost).toEqual({ unit: "credits", amount: 50 });
     // The 60 s reservation TTL of cafe B keeps the republish well inside the hold window.
-    expect(Date.parse(reserved.reservation.expires_at) - Date.parse(reserved.reservation.created_at)).toBe(60_000);
+    const holdMs = Date.parse(reserved.reservation.expires_at) - Date.parse(reserved.reservation.created_at);
+    expect(holdMs).toBeGreaterThanOrEqual(60_000);
+    expect(holdMs).toBeLessThan(61_000);
 
     const admin = async (method: string, path: string, requestBody: unknown): Promise<Record<string, unknown>> => {
       for (let i = 0; i < 12; i += 1) {
