@@ -295,9 +295,13 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
     const after = await balances(member);
     expect(after["credits"]!.reserved).toBe(0);
     expect(after["credits"]!.amount).toBe(before["credits"]!.amount);
-    // LipClient builds a fresh request_id and occurred_at on every call, so ANY same-key replay through it is
-    // an idempotency_conflict whatever is cached. A re-send can only receive a cached result if it reuses the
-    // identical request body including its context (input to R-07 and FR-069).
+    // After a successful balance-computing call has committed the expiry, the reservation is still not capturable.
+    const afterCommit = await refusal(() =>
+      client().redemptions.capture({ reservation_id: reserved.reservation.reservation_id, order_id: `ro-exp-${member}` } as never, { idempotencyKey: `capture2:r-exp-${member}` })
+    );
+    expect(afterCommit).toEqual({ status: 409, code: "expired" });
+    // The idempotency fingerprint ignores the context envelope (source read: engine.ts); this re-send differs in its
+    // business payload because the order builder stamps placed_at with the current time, hence the conflict.
     const replay = await refusal(() => reserve(member, `r-exp-${member}`, "one-dollar-off", `ro-exp-${member}`, 1000));
     expect(replay).toEqual({ status: 409, code: "idempotency_conflict" });
   });
@@ -433,6 +437,8 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
       )
     );
     expect(reserved.reservation.cost).toEqual({ unit: "credits", amount: 50 });
+    // The 60 s reservation TTL of cafe B keeps the republish well inside the hold window.
+    expect(Date.parse(reserved.reservation.expires_at) - Date.parse(reserved.reservation.created_at)).toBe(60_000);
 
     const admin = async (method: string, path: string, requestBody: unknown): Promise<Record<string, unknown>> => {
       for (let i = 0; i < 12; i += 1) {
@@ -478,5 +484,30 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
       )
     );
     expect(fresh.reservation.cost).toEqual({ unit: "credits", amount: 80 });
+  });
+  it("replays the cached accrual for a same-key re-send whose business payload is identical (placed_at pinned) (R-07, OD-15)", async () => {
+    const member = await freshMember();
+    const orderId = `replay-${member}`;
+    const build = () =>
+      new FoodserviceOrderBuilder({
+        orderId,
+        scope: scope(branch()),
+        memberId: member,
+        currency: "USD",
+        channel: "counter",
+        businessDate: "2026-07-14",
+        status: "paid",
+        placedAt: "2026-07-14T10:00:00.000Z"
+      })
+        .addItem({ lineId: "l1", productId: "meal", name: "Meal", unitPrice: money(1000, "USD") })
+        .addTender({ tenderId: "t1", type: "cash", amount: money(1000, "USD") })
+        .close("2026-07-14T10:08:00.000Z")
+        .build();
+    const post = () => retry500(() => client().accruals.post({ member_id: member, order: build() }, { idempotencyKey: `accrue:${orderId}` }));
+    const first = await post();
+    const second = await post();
+    expect(second.entry.entry_id).toBe(first.entry.entry_id);
+    const ledger = await retry500(() => client().ledger.list({ member_id: member, program_id: programId(), limit: 100 } as never));
+    expect(ledger.entries.filter((entry) => entry.order_id === orderId && entry.unit === "points")).toHaveLength(1);
   });
 });
