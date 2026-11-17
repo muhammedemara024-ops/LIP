@@ -2443,3 +2443,20 @@ Decision:
 Consequences:
 Date / approved by:
 ```
+
+## PD-052 — Continuous, persistent Wanees execution workflow; consolidated approval requests — Approved (owner directive, 2026-11-17)
+
+Context: the owner directed on 2026-11-17: "FIX THE WORKFLOW ITSELF … The owner requires continuous Spec Kit implementation across the entire dependency graph." Diagnosis: `phase-status.mjs` returned `resume` for any saved Phase not `merged` (so a Phase with recorded tasks or a blocked Phase wedged selection) and `stop`/`blocked` as terminal actions; selection and state were per Phase and per working tree (a delivery worktree saw no state and no fleet trust); `SKILL.md` ended with "report … then stop", reported on every invocation and treated a Phase as the unit of delivery; there was no run-level record to resume after compaction.
+
+Decision:
+1. `/wanees-phase run` is a continuous loop (Load State → Select Eligible Task → `/speckit-implement` → Test → Independent Review → Deliver → Update State → Select Next Task) over the whole dependency graph. Task, Phase and fast-forward-push boundaries never stop it. Exits: `finish` (COMPLETE or BLOCKED), a hard environment or governance fault, or compaction (resume through `run-state.mjs init`).
+2. A blocked task is parked with the exact approval it needs and never terminates the run. Dependants still wait for verified `done`.
+3. A recorded implementation authorization, including a labelled consolidated batch (`(owner, YYYY-MM-DD, batch <label>)`), is durable across Phases and deliveries and is never asked for again. PD-050 remains the standing delivery authorization. Recommendations, drafts and review verdicts are never approvals, and the orchestrator never records an authorization the owner did not write.
+4. When no task is eligible, ONE consolidated approval request (every approval-pending task, the gates to close, what is not yet requestable) is written into the BLOCKED report.
+5. The success marker `COMPLETE-<runId>.flag` is written only by `run-state.mjs finish`, only when every card is verified done, nothing is parked or in progress, and every completed task has a recorded delivery. Phase 8 gated tracks keep it unreachable until the owner un-gates them.
+6. `speckit-implement` is the implementation engine and is not edited (managed by the `specify` CLI); its generic stop points are bound in `SKILL.md` §0.
+7. No gate, approval, review requirement, Git safety rule or PD-050 delivery condition is weakened.
+
+Consequences: `.agents/skills/wanees-phase/` (SKILL.md, state-schema.md, phase-status.mjs, run-state.mjs and both self-tests), the pointer `.claude/skills/wanees-phase/SKILL.md` and the AGENTS.md §3 row change. No product code, upstream LIP file or contract changes.
+
+Date / approved by: 2026-11-17, project owner (directive); implementation review per AGENTS §5 (G02).

@@ -4,7 +4,7 @@
 // Git is called with --no-optional-locks, so no index refresh or lock happens.
 // Usage: node phase-status.mjs [--repo <dir>] [--phase <n>] [--json]
 import { readFileSync, existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
@@ -15,8 +15,6 @@ const onlyPhase = opt("--phase", null);
 const asJson = args.includes("--json");
 
 const TASKS = join(repo, "specs/002-p0-prd/tasks.md");
-const CONFIG = join(repo, ".delegate/config.json");
-const STATE_DIR = join(repo, ".scratch/wanees-phases");
 const GATED_PHASE = /gated tracks/i; // "Phase 8: Gated tracks — no implementation schedule"
 const warnings = [];
 
@@ -25,6 +23,13 @@ const git = (...a) => {
   catch { return null; }
 };
 const sha256 = (p) => createHash("sha256").update(readFileSync(p)).digest("hex");
+// Untracked state (.scratch), the delegate config and the delegate trust record live in the PRIMARY checkout. A delivery
+// worktree has none of them, so resolve the primary root through the shared Git directory, never the worktree's own.
+const commonDirRaw = git("rev-parse", "--git-common-dir");
+const commonDir = commonDirRaw ? resolve(repo, commonDirRaw) : null;
+const primary = commonDir ? dirname(commonDir) : repo;
+const STATE_DIR = process.env.WANEES_STATE_ROOT ? join(process.env.WANEES_STATE_ROOT, "wanees-phases") : join(primary, ".scratch/wanees-phases");
+const CONFIG = existsSync(join(repo, ".delegate/config.json")) ? join(repo, ".delegate/config.json") : join(primary, ".delegate/config.json");
 
 // ---------- parse tasks.md ----------
 const text = readFileSync(TASKS, "utf8").replace(/\r\n/g, "\n");
@@ -159,10 +164,12 @@ for (const c of tasks.values()) {
 const statusBlock = text.split("\n## ")[0];
 const LIST = /^(T\d{3})(\s*(,|,?\s*and)\s*T\d{3})*$/;
 const authorizations = [], revocations = [];
-for (const m of statusBlock.matchAll(/\*\*Implementation authorization( revoked)? \(owner, (\d{4}-\d{2}-\d{2})\):\s*([^.\n]*?)\s*\bonly\b/g)) {
-  const list = m[3].trim();
+// A consolidated batch is the same line with a label: "(owner, YYYY-MM-DD, batch <label>)". It authorizes exactly the listed tasks
+// for as long as the line stands; no per-phase, per-task or per-delivery re-approval is ever requested for them.
+for (const m of statusBlock.matchAll(/\*\*Implementation authorization( revoked)? \(owner, (\d{4}-\d{2}-\d{2})(?:, batch ([A-Za-z0-9._-]+))?\):\s*([^.\n]*?)\s*\bonly\b/g)) {
+  const list = m[4].trim();
   if (!LIST.test(list)) { warnings.push(`ignored a malformed authorization line (${m[2]}): "${list}"; ask the owner to restate it`); continue; }
-  (m[1] ? revocations : authorizations).push({ date: m[2], tasks: [...new Set(list.match(/\bT\d{3}\b/g))] });
+  (m[1] ? revocations : authorizations).push({ date: m[2], ...(m[3] ? { batch: m[3] } : {}), tasks: [...new Set(list.match(/\bT\d{3}\b/g))] });
 }
 const revoked = new Set(revocations.flatMap((a) => a.tasks));
 const authorized = new Set(authorizations.flatMap((a) => a.tasks).filter((t) => !revoked.has(t)));
@@ -256,7 +263,7 @@ try {
   if (lanes["final-verdict"]) fleet.problems.push("final-verdict lane present (retired under G02)");
   fleet.sha256 = sha256(CONFIG);
   const gitDir = git("rev-parse", "--absolute-git-dir");
-  const trust = gitDir && join(gitDir, "delegate-skills/project-config.sha256");
+  const trust = (commonDir || gitDir) && join(commonDir || gitDir, "delegate-skills/project-config.sha256");
   if (trust && existsSync(trust)) fleet.trusted = readFileSync(trust, "utf8").includes(fleet.sha256);
   if (fleet.trusted !== true) fleet.problems.push("project config not trusted (sha256 not approved)");
   fleet.ok = fleet.problems.length === 0;
@@ -274,7 +281,11 @@ const summary = all.filter((p) => !onlyPhase || String(p.id) === String(onlyPhas
 const nextPhase = all.find((p) => p.candidates.length);
 const laterPhasesWithCandidates = all.filter((p) => p.candidates.length && p !== nextPhase).map((p) => p.id);
 const unreadable = Object.entries(saved).find(([, st]) => st.stage === "unreadable");
-const activeSaved = Object.entries(saved).find(([, st]) => st.stage !== "merged");
+// "tracking" is the evidence-ledger stage written by run-state.mjs: it records completed tasks and holds no in-flight Phase work
+// (in-flight work is run-state.json current), so it never forces a resume. "blocked" is parked.
+const NON_ACTIVE = new Set(["merged", "blocked", "tracking"]);
+const activeSaved = Object.entries(saved).find(([, st]) => !NON_ACTIVE.has(st.stage));
+const parkedPhases = Object.entries(saved).filter(([, st]) => st.stage === "blocked").map(([d]) => d);
 const unblockers = [...tasks.values()].filter((c) => c.status === "awaiting-authorization" && c.taskDeps.every((t) => tasks.get(t)?.verifiedDone)).map((c) => c.id);
 // For every candidate: the closed-gate cells and unparsed clauses a human must read before dispatch.
 const readBeforeDispatch = Object.fromEntries([...tasks.values()].filter((c) => c.status === "candidate").map((c) => [c.id, {
@@ -282,9 +293,37 @@ const readBeforeDispatch = Object.fromEntries([...tasks.values()].filter((c) => 
   entryEvidence: Object.fromEntries(c.gates.filter((g) => entryEvidence[g]).map((g) => [g, entryEvidence[g].detail])), unparsed: c.unparsed }]));
 const waiting = [...tasks.values()].filter((c) => c.status === "waiting-deps" || c.status === "gates-open").map((c) => `${c.id} (${c.why})`);
 
+// ---------- continuous-run view: the whole dependency graph, not one Phase ----------
+const allCards = [...tasks.values()];
+const queue = allCards.filter((c) => c.status === "candidate").map((c) => ({ id: c.id, phase: c.phase, branch: `feat/wanees-phase-${c.phase}` }))
+  .sort((a, b) => a.phase - b.phase || a.id.localeCompare(b.id));
+const NEEDS = {
+  "done-unverified": () => "evidence record (orchestrator): verify the card and record its evidence in a state.json",
+  "gated-track": () => "owner un-gates the track; never schedulable by the workflow",
+  "awaiting-content-approval": () => "owner Gate 2 content approval, then implementation authorization",
+  "awaiting-authorization": () => "owner implementation authorization",
+  "waiting-deps": (c) => `prerequisite tasks: ${c.why.replace(/^.*?: /, "")}`,
+  "gates-open": (c) => `gates: ${c.why.replace(/^.*?: /, "")}`,
+};
+const blockers = allCards.filter((c) => c.status !== "done" && c.status !== "candidate").map((c) => ({ id: c.id, phase: c.phase, status: c.status, needs: NEEDS[c.status](c), ownerNeeded: ["awaiting-content-approval", "awaiting-authorization", "gated-track", "gates-open"].includes(c.status) }));
+// ONE request covering every scope that only waits for an owner approval; tasks that wait on other approval-pending tasks follow in the same request.
+const APPROVAL = new Set(["awaiting-content-approval", "awaiting-authorization"]);
+const pending = allCards.filter((c) => APPROVAL.has(c.status));
+const pendingIds = new Set(pending.map((c) => c.id));
+const requestable = pending.filter((c) => c.taskDeps.every((t) => tasks.get(t)?.verifiedDone || pendingIds.has(t)));
+const requestIds = new Set(requestable.map((c) => c.id));
+const consolidatedApproval = {
+  single: true,
+  tasks: requestable.map((c) => ({ id: c.id, phase: c.phase, needs: c.status === "awaiting-content-approval" ? ["gate2-content", "implementation-authorization"] : ["implementation-authorization"],
+    afterTasks: c.taskDeps.filter((t) => requestIds.has(t)), openGates: c.gates.filter((g) => g !== "G-IMPLEMENT" && gateOpen(c, g)) })),
+  gatesToClose: [...new Set(requestable.flatMap((c) => c.gates.filter((g) => g !== "G-IMPLEMENT" && gateOpen(c, g))))],
+  excluded: pending.filter((c) => !requestIds.has(c.id)).map((c) => ({ id: c.id, why: `depends on tasks that are neither done nor requestable: ${c.taskDeps.filter((t) => !tasks.get(t)?.verifiedDone && !pendingIds.has(t)).join(", ")}` })),
+};
+const totals = { cards: allCards.length, done: allCards.filter((c) => c.status === "done").length, candidates: queue.length, blocked: blockers.length };
+
 const out = {
   generatedFrom: { tasks: "specs/002-p0-prd/tasks.md", tasksSha256: sha256(TASKS), cards: tasks.size },
-  authorizations, revocations, entryEvidence, fleet, git: gitState, savedPhases: saved, warnings, readBeforeDispatch, phases: summary,
+  authorizations, revocations, entryEvidence, fleet, git: gitState, savedPhases: saved, parkedPhases, warnings, readBeforeDispatch, phases: summary, queue, blockers, totals,
   next: !fleet.ok
     ? { action: "stop", reason: `fleet not OK: ${fleet.problems.join("; ")}. Stop before any dispatch` }
     : unreadable
@@ -292,8 +331,8 @@ const out = {
     : activeSaved
     ? { action: "resume", state: activeSaved[0], stage: activeSaved[1].stage, note: "verify recorded state against Git before acting (SKILL.md §1)" }
     : nextPhase
-    ? { action: "run-phase", phase: nextPhase.id, branch: nextPhase.branch, candidates: nextPhase.candidates, parallelAdvisory: nextPhase.parallelAdvisory, laterPhasesWithCandidates }
-    : { action: "blocked", smallestUnblockingAuthorizations: unblockers, authorizedButWaiting: waiting },
+    ? { action: "run-phase", phase: nextPhase.id, branch: nextPhase.branch, candidates: nextPhase.candidates, parallelAdvisory: nextPhase.parallelAdvisory, laterPhasesWithCandidates, queue }
+    : { action: "blocked", smallestUnblockingAuthorizations: unblockers, authorizedButWaiting: waiting, consolidatedApproval },
   tasks: Object.fromEntries([...tasks.values()].filter((c) => !onlyPhase || String(c.phase) === String(onlyPhase)).map((c) => [c.id,
     { phase: c.phase, status: c.status, why: c.why || null, contentApproved: c.contentApproved, risk: c.risk, plannedTarget: c.plannedTarget,
       primaryPath: c.primaryPath, taskDeps: c.taskDeps, gates: c.gates, unparsed: c.unparsed }])),
@@ -323,4 +362,10 @@ const n = out.next;
 if (n.action === "stop") pr(`NEXT: STOP. ${n.reason}`);
 else if (n.action === "resume") pr(`NEXT: resume ${n.state} (stage ${n.stage}); ${n.note}`);
 else if (n.action === "run-phase") pr(`NEXT: Phase ${n.phase} on ${n.branch}: ${n.candidates.join(", ")}${n.parallelAdvisory.length ? ` (parallel, advisory: ${n.parallelAdvisory.join(", ")}; prove disjoint Scope sets first)` : ""}; read the WARNING/READ lines above and log them before dispatch${n.laterPhasesWithCandidates.length ? `; later Phases with candidates (run after this Phase, one branch at a time): ${n.laterPhasesWithCandidates.join(", ")}` : ""}`);
-else { pr("NEXT: no eligible task."); pr(`  smallest unblocking authorization(s): ${unblockers.join(", ") || "none"}`); for (const w of waiting) pr(`  authorized but waiting: ${w}`); }
+else {
+  pr("NEXT: no eligible task. Do not stop on a single task: write ONE consolidated approval request and the run-level BLOCKED report (run-state.mjs finish).");
+  pr(`  smallest unblocking authorization(s): ${unblockers.join(", ") || "none"}`);
+  for (const w of waiting) pr(`  authorized but waiting: ${w}`);
+  pr(`  consolidated approval request: ${consolidatedApproval.tasks.map((t) => t.id).join(", ") || "none"}; gates to close: ${consolidatedApproval.gatesToClose.join(", ") || "none"}`);
+}
+pr(`QUEUE (all Phases): ${queue.map((q) => `${q.id}[P${q.phase}]`).join(", ") || "empty"}; parked Phases: ${parkedPhases.join(", ") || "none"}; done ${totals.done}/${totals.cards}`);

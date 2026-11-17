@@ -7,7 +7,7 @@ File: `.scratch/wanees-phases/phase-<n>/state.json`. It is untracked. Write it a
   "schema": "wanees-phase.v1",
   "phase": { "id": 2, "title": "Foundational …", "tasksSha256": "<sha256 of specs/002-p0-prd/tasks.md at start>" },
   "branch": "feat/wanees-phase-2",
-  "stage": "selected | preflight | executing | verifying | reviewing | awaiting-owner | committed | pushed | pr-open | merged | blocked",
+  "stage": "selected | preflight | executing | verifying | reviewing | awaiting-owner | committed | pushed | pr-open | merged | blocked | tracking",
   "delivery": "direct-main | pr",
   "mainSha": "<sha on main after a direct push; for direct delivery, stage merged means pushed to main>",
   "baseline": {
@@ -40,6 +40,10 @@ File: `.scratch/wanees-phases/phase-<n>/state.json`. It is untracked. Write it a
   "blockers": [ { "id": "baseline-not-in-git", "detail": "<text>", "needs": "owner" } ]
 }
 ```
+
+**Stages that never gate selection.** `merged` (delivered), `blocked` (parked Phase) and `tracking` (evidence ledger written by `run-state.mjs`, holding no in-flight Phase work) never force `resume`. Every other stage means in-flight Phase work that must be verified against Git and finished first.
+
+**Run record** (`.scratch/wanees-runs/<runId>/run.json`, written only by `run-state.mjs`): `{ schema: "wanees-run.v1", runId, startedAt, finished, current: {task, phase, since} | null, completed: [{task, phase, evidence, sha?}], blocked: [{task, reason, needs}], deliveries: [{sha, tasks, ci?}], checkpoints: [] }`. Task evidence itself is written into the Phase `state.json` below.
 
 **Rules**
 

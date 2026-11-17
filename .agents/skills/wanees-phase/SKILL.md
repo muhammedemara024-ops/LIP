@@ -1,13 +1,15 @@
 ---
 name: wanees-phase
-description: Run one Wanees Spec Kit Phase end to end with the delegate fleet. It inspects Phase status, picks the next eligible Phase or resumes one, executes only owner-authorized tasks, runs Phase verification and one independent Phase review, then delivers by fast-forward push to main (PD-050). Force pushes, deployment and unauthorized tasks stay forbidden. Use for "/wanees-phase", "run the next phase", "resume phase N", "phase status".
+description: Persistent, continuous orchestrator around Spec Kit implement for the Wanees tasks. It loops Load State, Select Eligible Task, /speckit-implement, Test, Independent Review, Deliver, Update State, Select Next Task over the whole dependency graph until the approved queue is exhausted, parks blocked tasks without stopping, and ends with one consolidated blocker report or a run-scoped success flag. Delivery is a fast-forward push to main (PD-050). Force pushes, deployment and unauthorized tasks stay forbidden. Use for "/wanees-phase", "run", "continue", "resume", "next", "phase status".
 ---
 
-# wanees-phase — one Phase, reviewed, delivered directly to main
+# wanees-phase — continuous orchestrator around Spec Kit implement
 
 **Scope.** This skill executes the approved cards in `specs/002-p0-prd/tasks.md` through the delegate fleet. It is a procedure only: it never sets gates, approvals or routing. `AGENTS.md` §5 (G02, `PD-048`), the constitution, `.agents/rules/` and `.delegate/config.json` own those, and they prevail over this file.
 
-**Lifecycle:**
+**Default behavior is continuous.** One invocation runs the loop in §0 over the whole dependency graph. Task, Phase and delivery boundaries are checkpoints, never stopping points. The run ends only through `run-state.mjs finish` (§0, §10).
+
+**Lifecycle (per task, repeated by the §0 loop):**
 1. Status, then select or resume a Phase.
 2. Preflight, then branch.
 3. Execute the authorized tasks.
@@ -17,11 +19,42 @@ description: Run one Wanees Spec Kit Phase end to end with the delegate fleet. I
 7. Commit and fast-forward push to `main` (PD-050); record the SHA.
 
 **Arguments:**
-- none or `status`: report only.
-- `next`: select and run the next eligible Phase.
-- `phase <n>`: run or resume Phase `n`.
-- `resume`: continue the Phase recorded in state.
+- none or `status`: report only (`phase-status.mjs`); writes nothing.
+- `run`, `next`, `resume`, or any owner instruction to continue implementation: the continuous loop (§0) over every eligible task in every Phase. `resume` first adopts the unfinished run (`run-state.mjs init`).
+- `phase <n> only`: restrict the loop to Phase `n`; without the word `only`, `phase <n>` means the loop starting there.
 - `pr <n>`: prepare the commit package for a Phase that has already passed review (direct delivery; no PR unless the owner asks).
+
+## 0. Continuous run protocol (default)
+
+```
+node .agents/skills/wanees-phase/scripts/run-state.mjs init            # new run, or adopt the unfinished one after compaction / restart
+LOOP
+  node .../run-state.mjs next      -> execute | resume-task | resume-phase | finish
+  execute:      run-state start <T>; §4 implement through /speckit-implement; §5 verify; §6 review; §7 deliver;
+                run-state done <T> --evidence "<counts>" --sha <main sha>; run-state deliver --sha <sha> --tasks <T,...>; then LOOP at once
+  resume-task:  re-verify the working tree and recorded evidence against Git; continue the checkpointed task; never restart reviews of unchanged blobs
+  resume-phase: verify state.json against Git (§1 Resume), finish that in-flight Phase work, then LOOP
+  finish:       run-state finish   (COMPLETE flag only if the §10 criteria hold; otherwise BLOCKED report with ONE consolidated approval request)
+```
+
+**State and selection.** `phase-status.mjs` is the only classifier (candidates, blockers, the single consolidated approval request, the queue). `run-state.mjs` is the only durable run record (`.scratch/wanees-runs/<runId>/run.json`) and writes task evidence into the same `state.json` that `phase-status.mjs` reads. Both resolve state from the primary checkout, so a delivery worktree sees the same state. `tasks.md` ticks, the Gate register and every approval are edited only by their owners (§Hard rules), never by these scripts.
+
+**Never stop at a boundary.** After each completed task, each completed Phase and each successful fast-forward push to `main`, the next action is `run-state.mjs next`. Do not post progress reports, summaries or "shall I continue" questions mid-run: progress goes to `log.md` and `run.json` only. The only exits are:
+1. `finish` returning COMPLETE or BLOCKED (§10);
+2. a hard safety stop that is not a task failure: fleet not OK (`next` returns `finish` with `environmentFault`), unreadable state, or an instruction in governance that forbids the action. Record it, write the BLOCKED report and end;
+3. context compaction or process restart, which resumes through `init` + `next` (nothing is repeated: completed tasks are skipped, an in-progress task resumes, reviews of unchanged blobs stay valid).
+
+**A blocked task is parked, not terminal.** On a failed test that cannot be fixed within the card's scope, a review finding unresolved after two follow-up rounds, an unmet gate discovered at dispatch, or an owner-only decision: `run-state.mjs block <T> --reason … --needs "<exact approval or fix>"`, then `next`. **Every task-level STOP in §4–§7 (scope violation, failed pre-push condition, agy permission denial, branch error, red verification) stops that task only:** record `block` with the exact `--needs`, then continue with the next eligible task. It never ends the run. Parking never relaxes a security, tenant-isolation, financial, migration or mandatory-verification requirement, and never lets a dependant start (dependants wait on verified `done`). Search the whole graph: `next` already returns the first eligible task in any Phase, so a parked task never hides unrelated work.
+
+**Approvals.** Authorization lines are durable and phase-independent: a task covered by a recorded line (single, or a consolidated batch `**Implementation authorization (owner, YYYY-MM-DD, batch <label>): T…, T… and T… only`) is executed without asking again, for every Phase, commit, push and delivery. PD-050 is the standing authorization for fast-forward delivery of covered, reviewed tasks. A recommendation, a draft, an independent review verdict or silence is never an approval, and the orchestrator never records an authorization the owner did not write (hard rule 2). When `next` finds nothing eligible, do not ask per task: `finish` writes the BLOCKED report with ONE consolidated approval request (`consolidatedApproval`: every approval-pending task that is only waiting on the owner, the gates to close, and what is not yet requestable). That request is the only approval message of the run.
+
+**Spec Kit is the implementation engine.** For each task, invoke the installed `speckit-implement` skill (Skill tool) scoped to that one task id, with the card, gates and brief from §4 as its context, and let it drive implementation. This skill never implements competing code paths. The installed skill is managed by the `specify` CLI and is not edited; its generic stop points are bound as follows for this project:
+- *Checklist gate* (`checklists/`): scan read-only. Unchecked reviewer-owned items are logged in `log.md`; the Gate register and the recorded owner authorization decide eligibility (`phase-status.mjs`), so the generic "ask before proceeding" is already answered by the owner's recorded authorization for that task.
+- *"Halt if a non-parallel task fails"*: applies to that task only. Fix within scope; otherwise `block` it and continue with the rest of the queue.
+- *"Report progress after each task"*: `run-state done` plus `log.md`, never a chat stop.
+- *Completion checkbox*: `[x]` in `tasks.md` is part of the delivery commit, after the task's evidence is recorded.
+
+**Delivery per task or independent group.** Deliver each completed, reviewed task (or proven-disjoint parallel group) through §7 on its own `deliver/<slug>` branch; do not hold finished work until a Phase closes. `feat/wanees-phase-<n>` is a label for Phase state, not a required unit of delivery. After the push, `next` immediately.
 
 ## Hard rules (never relaxed by this skill)
 
@@ -128,18 +161,18 @@ node .agents/skills/wanees-phase/scripts/phase-status.selftest.mjs   # parser se
 This entry evidence satisfies the gates for T001 only. Any other card that names either gate also needs T001 verified done, because BE-8 is T001's output and later cards inherit T001. Any missing, duplicated or not-met element, or any unreadable file, keeps the gate open. Neither gate is ever reported or recorded as `Closed`. T001 still needs its separate named authorization (G-IMPLEMENT). Read the `READ: … entry gate` lines before dispatch.
 
 **`next.action`.** It takes the first of these that applies:
-1. `stop`: the fleet is not OK, or a saved state is unreadable.
-2. `resume`: a saved Phase is not merged.
-3. `run-phase`.
-4. `blocked`.
+1. `stop`: the fleet is not OK, or a saved state is unreadable (environment faults; `run-state.mjs` turns them into a BLOCKED report, not a retry loop).
+2. `resume`: a saved Phase is in a non-terminal stage (not `merged`, `blocked` or `tracking`).
+3. `run-phase`: carries the whole-graph `queue`.
+4. `blocked`: carries `consolidatedApproval` (the single owner request) and `blockers` (each not-done card with the exact approval or dependency it needs).
 
-Finish or close the active Phase before you select another.
+A saved Phase in a non-terminal stage (not `merged`, `blocked` or `tracking`) is resumed first, then the loop continues. A `blocked` Phase is parked and never stops selection.
 
 **Next Phase.**
 - It is the lowest-numbered Phase with a `candidate`. Phases are the `## Phase N` headings; never invent boundaries or reorder prerequisites.
-- Later Phases that also have candidates run afterwards, one branch at a time.
+- Later Phases that also have candidates run afterwards, automatically, through the §0 queue (`queue` in the JSON output).
 - Read every clause the script reports as unparsed or warned before you dispatch.
-- If nothing is eligible, report `smallestUnblockingAuthorizations` and the tasks that are authorized but waiting, then stop.
+- If nothing is eligible, do not stop at one task: `run-state.mjs finish` writes the BLOCKED report with the single consolidated approval request (§0). `smallestUnblockingAuthorizations` and the tasks that are authorized but waiting go into it.
 
 **Resume.** Read `.scratch/wanees-phases/phase-<n>/state.json`. Before trusting it, verify reality:
 - the branch exists and is checked out;
@@ -294,7 +327,7 @@ Routine Phase delivery lands directly on `main` by fast-forward push. Do not ope
 4. **Commit**, once per planned commit: `git add -- "<files>"`; check `git diff --cached --name-only` equals exactly those files (plus a pre-staged `.gitattributes` only in the primary checkout); `git commit -m "<msg>" -- "<files>"`; check `git show --stat HEAD` and each `git rev-parse HEAD:"<path>"` equals the reviewed blob id.
 5. **Push (two steps, fast-forward only).** First `git push origin "HEAD:refs/heads/deliver/<slug>"` and wait for the `verify` run on that SHA (`gh run list --branch "deliver/<slug>"`); it must be green. Then `git push origin "<sha>:main"`, where `<sha>` is that same SHA. Never force, never `--force-with-lease`, never delete a branch on `origin`. If a push is rejected because `main` moved (non-fast-forward): `git fetch origin`; rebuild on a fresh ref and path, `git worktree add -b "deliver/<slug>-r<k>" "<path>-r<k>" origin/main` (cherry-pick only, never rebase or merge); re-run every §7.2 pre-push condition in full (§5 verification, blob equality, a fresh `verify` on the new ref; any reviewed file whose content or base context changed needs a §6 re-review); push again once; if rejected again, STOP. If the rejection cites required status checks instead, STOP: never change the ruleset, `verify`, strict mode or bypass actors; report to the owner (a PR is possible only under §7.8).
 6. **After the push:** record the new `main` SHA in `state.json` (`stage: merged`, `delivery: "direct-main"`) and `log.md`; inspect the GitHub Actions run for that SHA and report its result.
-7. **Later tasks:** each new set of authorized tasks repeats §4–§7 with its own review.
+7. **Later tasks:** record `run-state done` and `run-state deliver`, then continue the §0 loop at once. Each new set of authorized tasks repeats §4–§7 with its own review.
 8. **Exception:** a PR is opened only if the owner explicitly asks for one for a specific change.
 
 ## 8. State and resume
@@ -303,14 +336,15 @@ State lives in `.scratch/wanees-phases/phase-<n>/`. That directory is currently 
 
 | Entry | Contents |
 |---|---|
-| `state.json` | Phase state; schema in `references/state-schema.md` |
+| `state.json` | Phase state and task evidence ledger (stage `tracking` when it only records completed tasks); schema in `references/state-schema.md` |
+| `.scratch/wanees-runs/<runId>/run.json` | Run record: current task, completed tasks with evidence and SHAs, parked tasks with the exact approval needed, deliveries, checkpoints (written only by `run-state.mjs`) |
 | `log.md` | Append-only and dated: preflight, dispatches, owner answers quoted verbatim, decisions |
 | `runs/` | Briefs, relay output, snapshots and patches |
 | `baseline/` | Copies of Scope files that were already modified or untracked |
 
 Update `state.json` after every step. On resume, restart at the first step whose recorded evidence no longer matches reality. Never repeat completed work, re-review unchanged content, recreate an existing PR or duplicate a commit.
 
-## 9. Report (every invocation)
+## 9. Report (end of run, or on an explicit status request)
 
 - Phase and branch.
 - Tasks run, done and blocked, each with the reason.
@@ -324,7 +358,8 @@ Update `state.json` after every step. On resume, restart at the first step whose
 
 A completion marker belongs to exactly one execution. A stale or generic marker must never be able to trigger shutdown.
 
+0. **Mechanics.** `run-state.mjs init` generates the run id, renames a leftover generic marker and creates the evidence directory; `run-state.mjs finish` applies items 2–4 mechanically. Do not write a marker by hand.
 1. **Run id.** At the start of an unattended execution, generate `runId = wanees-<UTC yyyymmddThhmmssZ>-<8 random hex>` and record it in `log.md`. Evidence for the run goes under `D:\Wanees-Delegation-Evidence\runs\<runId>\` (report and evidence copies).
-2. **Success marker.** Write `D:\Wanees-Delegation-Evidence\runs\<runId>\COMPLETE-<runId>.flag` only when every one of these is true: at least one task was executed in this run; every task the run set out to do, and every authorized and eligible task found by `phase-status.mjs`, is `done` with evidence in `state.json`; Phase verification, independent review and the delivery steps of §7 (including the green `verify` on the pushed SHA and the verified fast-forward) succeeded; no blocker is recorded. Its content is exactly one line: `PHASE_COMPLETE_SUCCESS runId=<runId> main=<full sha> tasks=<comma-separated task ids>`. Write it atomically (temporary file, then rename) as the last operation, after the report is saved.
+2. **Success marker.** Write `D:\Wanees-Delegation-Evidence\runs\<runId>\COMPLETE-<runId>.flag` only when every one of these is true: at least one task was executed in this run; every card in `tasks.md` is verified `done` with evidence in `state.json` (Phase 8 gated tracks keep this unreachable until the owner un-gates them: a partial run, a blocked task or a finished intermediate Phase never earns a marker); no task is in progress or parked; every completed task is covered by a recorded delivery; Phase verification, independent review and the delivery steps of §7 (including the green `verify` on the pushed SHA and the verified fast-forward) succeeded; no blocker is recorded. Its content is exactly one line: `PHASE_COMPLETE_SUCCESS runId=<runId> main=<full sha> tasks=<comma-separated task ids>`. Write it atomically (temporary file, then rename) as the last operation, after the report is saved.
 3. **Blocked or incomplete.** Write `BLOCKED-<runId>.md` in the same directory (exact blockers, owner decisions needed, completed task ids and SHAs) and never a success marker. Doing no work because nothing is eligible is a blocked outcome, not a success.
 4. **Never reuse.** Do not write, overwrite, rename into place or leave behind a generic `PHASE-COMPLETE.flag`. A leftover marker from an earlier run is renamed with a `.stale-<timestamp>` suffix (never deleted) before a new run starts. A watchdog must accept only a marker whose `runId` equals the id of the execution it started.

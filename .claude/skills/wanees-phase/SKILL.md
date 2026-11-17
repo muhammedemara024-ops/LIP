@@ -1,7 +1,7 @@
 ---
 name: wanees-phase
-description: Run one Wanees Spec Kit Phase end to end with the delegate fleet. It inspects Phase status, picks the next eligible Phase or resumes one, executes only owner-authorized tasks, runs Phase verification and one independent Phase review, then prepares one PR per Phase. Commit, push and PR need explicit owner authorization. Use for "/wanees-phase", "run the next phase", "resume phase N", "phase status".
-argument-hint: "[status | next | phase <n> | resume | pr <n>]"
+description: Persistent continuous orchestrator around Spec Kit implement for the Wanees tasks: loops select, implement, test, independent review, deliver, update state across all Phases until the approved queue is exhausted, parks blocked tasks, and ends with one consolidated blocker report or a run-scoped success flag. Use for "/wanees-phase", "run", "continue", "resume", "next", "phase status".
+argument-hint: "[status | run | next | resume | phase <n> [only] | pr <n>]"
 ---
 
 # wanees-phase (Claude Code pointer)
@@ -14,6 +14,6 @@ If you received no arguments or `status`, run only:
 node .agents/skills/wanees-phase/scripts/phase-status.mjs
 ```
 
-Report the result and stop. (To check the parser, run `node .agents/skills/wanees-phase/scripts/phase-status.selftest.mjs`.)
+Report the result and stop (status is the only report-and-stop mode). For `run`, `next`, `resume` or `phase <n>`, follow the continuous loop in SKILL.md §0 and do not stop between tasks, Phases or deliveries. Self-tests: `node .agents/skills/wanees-phase/scripts/phase-status.selftest.mjs` and `node .agents/skills/wanees-phase/scripts/run-state.selftest.mjs`.
 
 Governance prevails over the procedure: `AGENTS.md` §5 (G02, `PD-048`), the constitution and `.agents/rules/`.
