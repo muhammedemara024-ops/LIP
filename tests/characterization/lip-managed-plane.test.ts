@@ -89,7 +89,7 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
     fx = (await import(FIXTURES)) as Fixtures;
     database = await fx.createDisposableDatabase(adminUrl!);
     plane = await fx.startManagedPlane(database.url, {
-      program: (programId) => ({ ...makeHybridProgram(), program_id: programId, reservation_ttl_seconds: RESERVATION_TTL_SECONDS })
+      program: (programId) => ({ ...makeHybridProgram(), program_id: programId, reservation_ttl_seconds: programId.startsWith("program-b") ? 60 : RESERVATION_TTL_SECONDS })
     });
     world = await fx.seedWorld(plane.cafes);
   }, 180_000);
@@ -271,7 +271,7 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
     expect(outcome.entry.location_id).toBe(dead);
   });
 
-  it("holds the cost quoted at reserve time (the republish case is not yet tested) and restores the reserved amount exactly once on expiry (PD-025; R-16)", async () => {
+  it("holds the cost quoted at reserve time and restores the reserved amount exactly once on expiry (PD-025; R-16)", async () => {
     const member = await freshMember();
     await accrue(member, `cost-${member}`, 5000);
     const before = await balances(member);
@@ -323,7 +323,7 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
     holder.environment.status = "suspended";
     try {
       const refused = await refusal(() => client().accounts.get({ member_id: member, program_id: programId() }));
-      expect([401, 403, 404, 409, 503]).toContain(refused.status);
+      expect(refused).toEqual({ status: 409, code: "environment_not_ready" });
     } finally {
       holder.environment.status = "ready";
     }
@@ -334,41 +334,43 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
     const member = await freshMember();
     const attempt = () => reserve(member, `r-refused-${member}`, "one-dollar-off", `ro-refused-${member}`, 1000);
     const refused = await refusal(attempt); // no credits yet
-    expect(refused.status).toBe(409);
+    expect(refused).toEqual({ status: 409, code: "insufficient_balance" });
     await accrue(member, `fund-${member}`, 5000);
     const reserved = await attempt(); // identical key and redemption id
     expect(reserved.reservation.status).toBe("reserved");
   });
 
-  it("keeps a stored reserved reservation blocking cancel after its expiry until a call applies the expiry (check a)", async () => {
+  it("keeps a stored reserved reservation blocking cancel and re-reserve after its expiry until a successful balance-computing call commits the expiry (check a)", async () => {
+    // Source read: cancel and reserve read the STORED status (engine.ts cancelIssuedReward / reserve), while a
+    // refused capture or reverse rolls back and persists nothing; any successful call that computes a balance
+    // re-derives and commits the expiry of every reservation in the program.
     const member = await freshMember();
     await reachThreeStamps(member, "stale");
     const reserved = await reserve(member, `r-stale-${member}`, "free-entree", `ro-stale-${member}`, 1200, `stamp-${member}-1`);
     await sleep((RESERVATION_TTL_SECONDS + 1.5) * 1000);
     const cancel = (key: string) =>
       refusal(() => client().issuedRewards.cancel({ issued_reward_id: `stamp-${member}-1`, reason: "characterization" } as never, { idempotencyKey: key }));
-    // Observed: expiry is applied lazily, so the stale stored status still blocks the cancel.
     expect(await cancel(`cancel-stale-1:${member}`)).toEqual({ status: 409, code: "invalid_state" });
-    // A capture that touches the reservation applies the expiry...
+    // A capture re-derives the expiry but its transaction rolls back, so nothing is committed.
     const late = await refusal(() =>
       client().redemptions.capture({ reservation_id: reserved.reservation.reservation_id, order_id: `ro-stale-${member}` } as never, { idempotencyKey: `capture-stale:${member}` })
     );
     expect(late).toEqual({ status: 409, code: "expired" });
-    // Observed: even after the expiry was applied, the issued reward still cannot be cancelled.
     expect(await cancel(`cancel-stale-2:${member}`)).toEqual({ status: 409, code: "invalid_state" });
-    // Observed: a fresh reserve (new redemption and order ids) of the same issued reward is refused 409 conflict too,
-    // so an expired reservation leaves the stamp reward stuck for both cancel and re-reserve (owner decision item).
-    const again = await reserve(member, `r-stale-again-${member}`, "free-entree", `ro-stale-again-${member}`, 1200, `stamp-${member}-1`).then(
-      () => "reserved",
-      (error: unknown) => `refused:${(error as { status?: number }).status}:${(error as { code?: string }).code}`
-    );
-    expect(again).toBe("refused:409:conflict");
+    const reReserve = () => reserve(member, `r-stale-again-${member}`, "free-entree", `ro-stale-again-${member}`, 1200, `stamp-${member}-1`);
+    expect(await refusal(reReserve)).toEqual({ status: 409, code: "conflict" });
+    // A successful balance-computing call commits the expiry; the reward is then usable again.
+    await balances(member);
+    const again = await reReserve();
+    expect(again.reservation.status).toBe("reserved");
   });
 
-  it("never duplicates a write whose client gave up, and a same-body retry returns to a single entry (R-07 input)", async () => {
-    // Source read: neither packages/server nor apps/cloud sets a statement or request timeout, so a write
-    // is bounded only by Node's default HTTP request timeout. This test executes the safe property only:
-    // after a client abort and a same-key, same-body retry the ledger holds exactly one accrual.
+  it("leaves exactly one accrual after a client abort and a same-key, same-body retry (R-07 input; the abort may precede receipt)", async () => {
+    // Source read: no application-level bound. Once the body is received the handler runs to completion
+    // regardless of client disconnect (no close/aborted handling), it may queue behind the per-program lock,
+    // and PostgreSQL has no statement_timeout, so a write can commit after an unbounded delay (R-07 stays
+    // fail-closed; bounding it needs a separate decision). This test executes only the safe property: after a
+    // client abort and a same-key, same-body retry the ledger holds exactly one accrual.
     const member = await freshMember();
     const orderId = `abort-${member}`;
     const body = JSON.stringify({
@@ -388,11 +390,13 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
     setTimeout(() => controller.abort(), 15);
     await first;
     await sleep(3000);
-    for (let i = 0; i < 12; i += 1) {
-      const retry = await send();
-      if (retry.status !== 500) break;
-      await sleep(250);
+    let status = 500;
+    for (let i = 0; i < 12 && status === 500; i += 1) {
+      status = (await send()).status;
+      if (status === 500) await sleep(250);
     }
+    expect(status).toBeGreaterThanOrEqual(200);
+    expect(status).toBeLessThan(300);
     const ledger = await retry500(() => client().ledger.list({ member_id: member, program_id: programId(), limit: 100 } as never));
     const points = ledger.entries.filter((entry) => entry.order_id === orderId && entry.unit === "points");
     expect(points).toHaveLength(1);
@@ -456,9 +460,23 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
     const draft = (await admin("PUT", "/admin/api/v1/program/draft", { program: republished }))["draft"] as { version: number };
     await admin("POST", "/admin/api/v1/program/publish", { expected_draft_version: draft.version });
 
+    const credits = async () => {
+      const account = await retry500(() => other.client.accounts.get({ member_id: member, program_id: other.programId }));
+      return account.balances.find((entry) => entry.unit === "credits")!.amount;
+    };
+    const beforeCapture = await credits();
     const captured = await retry500(() =>
       other.client.redemptions.capture({ reservation_id: reserved.reservation.reservation_id, order_id: `ro-rp-${member}` } as never, { idempotencyKey: `capture:r-rp-${member}` })
     );
     expect(captured.reservation.cost).toEqual({ unit: "credits", amount: 50 });
+    expect(beforeCapture - (await credits())).toBe(50);
+    // Positive control: the republish took effect, so a NEW hold is quoted at the new cost.
+    const fresh = await retry500(() =>
+      other.client.redemptions.reserve(
+        { redemption_id: `r-rp2-${member}`, member_id: member, reward_id: "one-dollar-off", order: buildOrder(`ro-rp2-${member}`, 1000, "open") } as never,
+        { idempotencyKey: `reserve:r-rp2-${member}` }
+      )
+    );
+    expect(fresh.reservation.cost).toEqual({ unit: "credits", amount: 80 });
   });
 });
