@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { Client } from "pg";
 import { FoodserviceOrderBuilder, LipApiError, money, type LipClient } from "@loyalty-interchange/sdk";
 import type { ProgramDefinition } from "@loyalty-interchange/reference";
 import { makeHybridProgram } from "../fixtures.js";
@@ -511,5 +512,109 @@ live("LIP managed data plane characterization (real PostgreSQL)", { timeout: 120
     expect(second.entry.entry_id).toBe(first.entry.entry_id);
     const ledger = await retry500(() => client().ledger.list({ member_id: member, program_id: programId(), limit: 100 } as never));
     expect(ledger.entries.filter((entry) => entry.order_id === orderId && entry.unit === "points")).toHaveLength(1);
+  });
+  async function sql<T extends Record<string, unknown>>(text: string, values: unknown[] = []): Promise<T[]> {
+    const db = new Client({ connectionString: database.url });
+    await db.connect();
+    try {
+      return (await db.query<T>(text, values)).rows;
+    } finally {
+      await db.end();
+    }
+  }
+
+  it("persists nothing on an error response and commits a lazy expiry only with the next successful call (check b, executed against the stored rows)", async () => {
+    const member = await freshMember();
+    await accrue(member, `atom-${member}`, 5000);
+    const reserved = await reserve(member, `r-atom-${member}`, "one-dollar-off", `ro-atom-${member}`, 1000);
+    const reservationId = reserved.reservation.reservation_id;
+    const tenantId = cafe().cafe.tenantId;
+    const stored = async () =>
+      (await sql<{ status: string }>("SELECT status FROM lip_engine_reservations WHERE tenant_id = $1 AND program_id = $2 AND reservation_id = $3", [tenantId, programId(), reservationId]))[0]?.status;
+    const idempotencyRows = async () =>
+      Number((await sql<{ n: string }>("SELECT count(*) AS n FROM lip_engine_idempotency WHERE tenant_id = $1 AND program_id = $2", [tenantId, programId()]))[0]!.n);
+    expect(await stored()).toBe("reserved");
+    await sleep((RESERVATION_TTL_SECONDS + 1.5) * 1000);
+
+    const rowsBefore = await idempotencyRows();
+    const refused = await refusal(() =>
+      client().redemptions.capture({ reservation_id: reservationId, order_id: `ro-atom-${member}` } as never, { idempotencyKey: `capture-atom:${member}` })
+    );
+    expect(refused).toEqual({ status: 409, code: "expired" });
+    // The error response rolled back: the stored status is still `reserved` and no idempotency record was written.
+    expect(await stored()).toBe("reserved");
+    expect(await idempotencyRows()).toBe(rowsBefore);
+
+    // A successful balance-computing call commits the expiry together with its own idempotency record.
+    await balances(member); // GET-style read through a mutating route
+    expect(await stored()).toBe("expired");
+  });
+
+  it("commits a queued write after the client gave up: the write waits on the per-program lock and still lands (R-07 late commit, executed)", async () => {
+    const member = await freshMember();
+    const orderId = `late-${member}`;
+    const body = JSON.stringify({
+      context: { protocol_version: "1.0", profile: "foodservice/1.0", request_id: `request_${member}`, idempotency_key: `accrue:${orderId}`, occurred_at: "2026-07-14T10:08:00.000Z", source: { system: "lip-sdk" } },
+      member_id: member,
+      order: order(member, orderId, 1000)
+    });
+    const send = (signal?: AbortSignal) =>
+      fetch(`${cafe().cafe.lipBaseUrl}/lip/v1/accruals`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${cafe().cafe.merchantApiKey}`, "content-type": "application/json" },
+        body,
+        ...(signal === undefined ? {} : { signal })
+      });
+    const rows = async () =>
+      Number((await sql<{ n: string }>("SELECT count(*) AS n FROM lip_engine_ledger WHERE tenant_id = $1 AND program_id = $2 AND order_id = $3", [cafe().cafe.tenantId, programId(), orderId]))[0]!.n);
+
+    // Hold the per-program engine lock from a separate session so the write queues behind it.
+    const holder = new Client({ connectionString: database.url });
+    await holder.connect();
+    await holder.query("BEGIN");
+    await holder.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`lip:engine:${cafe().cafe.tenantId}:${programId()}`]);
+    let released = false;
+    try {
+      // A spurious authenticate 500 answers at once and has no effect; retry until a request is actually parked
+      // on the lock (still pending after 1.5 s), then abort that one.
+      let parked = false;
+      for (let attempt = 0; attempt < 10 && !parked; attempt += 1) {
+        const controller = new AbortController();
+        const pending = send(controller.signal).then(
+          (response) => response,
+          () => "aborted" as const
+        );
+        const outcome = await Promise.race([pending, sleep(1500).then(() => "pending" as const)]);
+        if (outcome === "pending") {
+          parked = true;
+          controller.abort(); // the client gives up
+          expect(await pending).toBe("aborted");
+        }
+      }
+      expect(parked).toBe(true);
+      await sleep(1500);
+      expect(await rows()).toBe(0); // nothing has committed while the lock is held
+      await holder.query("COMMIT");
+      released = true;
+      let committed = 0;
+      for (let i = 0; i < 40 && committed === 0; i += 1) {
+        await sleep(250);
+        committed = await rows();
+      }
+      // The abandoned write still committed after the client had given up: the bound is the lock wait, not the client.
+      expect(committed).toBeGreaterThan(0);
+    } finally {
+      if (!released) await holder.query("ROLLBACK").catch(() => undefined);
+      await holder.end();
+    }
+    // A same-body retry replays and creates no second points entry.
+    let status = 500;
+    for (let i = 0; i < 12 && status === 500; i += 1) {
+      status = (await send()).status;
+      if (status === 500) await sleep(250);
+    }
+    expect(status).toBeLessThan(300);
+    const points = await sql<{ n: string }>("SELECT count(*) AS n FROM lip_engine_ledger WHERE tenant_id = $1 AND program_id = $2 AND order_id = $3 AND unit = 'points'", [cafe().cafe.tenantId, programId(), orderId]);
+    expect(Number(points[0]!.n)).toBe(1);
   });
 });
