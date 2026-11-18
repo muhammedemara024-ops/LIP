@@ -48,10 +48,12 @@ services:
       POSTGRES_USER: loyalty
       POSTGRES_PASSWORD: ${LIP_POSTGRES_PASSWORD:-lip-local-password}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U loyalty -d loyalty"]
+      # TCP probe (FP-008): the entrypoint's init server is socket-only, so healthy implies POSTGRES_DB exists.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U loyalty -d loyalty"]
       interval: 2s
       timeout: 3s
       retries: 20
+      start_period: 30s
     volumes:
       - lip-postgres-data:/var/lib/postgresql/data
 

@@ -185,9 +185,6 @@ describe("LocalDataPlaneProvisioner", () => {
       access_control: expect.objectContaining({ tenant: expect.anything() })
     });
 
-    // The credential is delivered as an operator-readable 0600 file.
-    expect(statSync(runtime.credentials_path).mode & 0o777).toBe(0o600);
-
     // A retried job for an already-running environment reuses the runtime.
     expect(await provisioner.provision({
       environment: ready!,
@@ -266,7 +263,6 @@ describe("LocalDataPlaneProvisioner", () => {
       }
     });
     expect(backup).not.toHaveProperty("sqlite_database_base64");
-    expect(statSync(backupPath).mode & 0o777).toBe(0o600);
     expect(provisioner.runtimes()).toHaveLength(1);
 
     const tamperedBackupPath = join(dataDirectory, "environment.tampered.backup.json");
@@ -310,6 +306,25 @@ describe("LocalDataPlaneProvisioner", () => {
     });
     expect(await fetch(`${restored.api_url}/health`).then((response) => response.status)).toBe(200);
   });
+
+  // Node writeFile({ mode: 0o600 }) / chmod(0o600) does not set NTFS ACLs on Windows; POSIX 0600
+  // enforcement is therefore unsupported on win32 and must remain verified on Linux.
+  it.skipIf(process.platform === "win32")(
+    "writes credential and backup files with 0600 permissions (unsupported on Windows NTFS)",
+    async () => {
+      const { provisioner, provisioned, worker, dataDirectory } = await fixture();
+      close = () => provisioner.close();
+      expect(await worker.runOnce()).toBe("succeeded");
+      const runtime = provisioned[0]!;
+      expect(statSync(runtime.credentials_path).mode & 0o777).toBe(0o600);
+
+      const backupPath = join(dataDirectory, "environment.permissions.backup.json");
+      await provisioner.backup(runtime.environment_id, backupPath, {
+        now: () => new Date("2026-08-15T20:00:00.000Z")
+      });
+      expect(statSync(backupPath).mode & 0o777).toBe(0o600);
+    }
+  );
 
   it("rejects tampered encrypted credentials and plaintext unless migration is explicit", async () => {
     const { provisioner, provisioned, repository, environment, worker, programDirectory,

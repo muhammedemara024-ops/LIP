@@ -443,7 +443,7 @@ describe("WebhookDispatcher", () => {
       expect(second.replayDelivery(deliveryId)).toBe(true);
       await second.flush();
       expect(captured).toHaveLength(2);
-      secondStore.close();
+      await secondStore.close();
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
