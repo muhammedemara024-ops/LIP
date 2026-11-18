@@ -14,7 +14,7 @@ Changes to `/lip/v1` wire semantics or `spec/` are never allowed and never appea
 | `.github/workflows/ci.yml` | FP-006: one added step in job `verify` runs the Wanees PR-automation policy self-test (`node --test .github/scripts/gate-policy.test.mjs`) | PD-049 | Trivial merge; re-apply the step if upstream rewrites job `verify` |
 | `.github/workflows/ci.yml` | FP-007: `on.push.branches` gains `"deliver/**"` so `verify` runs on delivery branches | PD-050 | Trivial merge; re-apply if upstream rewrites the `on:` block |
 | `compose.yaml`, `tests/unit/compose-postgres-readiness.test.ts` (new) | FP-008: `postgres` healthcheck probes TCP (`pg_isready -h 127.0.0.1 -p 5432 …`) and adds `start_period: 30s`, so `service_healthy` dependents (`lip-postgres`, `cloud`) cannot start before `POSTGRES_DB` exists | PD-002 (owner Tier 2 approval 2026-11-18) | Trivial merge; safe to drop if upstream adopts an equivalent post-init readiness probe |
-| `apps/cloud/src/data-plane-provisioner.test.ts`, `packages/server/src/migration.test.ts`, `tests/unit/member-migration.test.ts`, `tests/unit/server.test.ts`, `tests/unit/webhooks.test.ts` | FP-009 (**Proposed, not approved**): POSIX `0o600` assertions moved to dedicated tests skipped only on `win32`; two SQLite teardown fixes | — (pending owner approval) | Test-only; re-apply if upstream edits these tests |
+| `apps/cloud/src/data-plane-provisioner.test.ts`, `packages/server/src/migration.test.ts`, `tests/unit/member-migration.test.ts`, `tests/unit/server.test.ts`, `tests/unit/webhooks.test.ts` | FP-009 (Approved 2026-11-18, `DEC-FP009-01@1`): POSIX `0o600` assertions moved to dedicated tests skipped only on `win32`; two SQLite teardown fixes | `DEC-FP009-01@1` (owner approval 2026-11-18) | Test-only; re-apply if upstream edits these tests |
 
 ---
 
@@ -191,9 +191,9 @@ npm audit
 - **Rollback:** restore the previous `healthcheck` block and delete the test; no data or volume is affected.
 - **Upgrade impact:** trivial merge; candidate upstream contribution.
 
-### FP-009 (Proposed 2026-11-18 — in independent review scope; NOT owner-approved): Windows-portable permission tests and SQLite teardown
+### FP-009 (Approved 2026-11-18, `DEC-FP009-01@1`): Windows-portable permission tests and SQLite teardown
 
-- **Status:** the owner placed these changes in the FP-008 independent review scope on 2026-11-18 and stated that inclusion is not approval. They must not land until the owner approves them.
+- **Status:** Approved by the owner on 2026-11-18 through the Owner Dashboard: decision `DEC-FP009-01` revision 1 (digest `48c8f99f59a9f75706023497c98f8fe929881091cb23d37ed27f19050bd0698f`), audit seq 1, entry hash `6185f08455a25ae3ac8df655fa57d3fb6055281cb9669771d3a697b09a4c97d0`. Scope: the five test files below plus this entry; no production code. It lands together with FP-008 in commit `58d97fff74d20574f3759301f1318f74dceeed43` (commit authorization `DEC-FP008-COMMIT-01@1`, audit entry hash `35573d23ab34fc2f6b18c745a66e529ef65cc9449a43838cc43f14382f5afef4`). Independent review: Part A/B PASS (`.scratch/review-prep-20261118/fp008/run-20261118T143859Z/`, local-only). History: earlier on 2026-11-18 the owner placed these changes in the FP-008 independent review scope and stated that inclusion was not approval.
 - **Files (tests only):**
   - `apps/cloud/src/data-plane-provisioner.test.ts`, `packages/server/src/migration.test.ts`, `tests/unit/member-migration.test.ts`: the inline `0o600` mode assertions (credential file, backup archive, migration archive, member import plan) move unchanged into one dedicated test per file, marked `it.skipIf(process.platform === "win32")`. The functional tests they came from keep every other assertion.
   - `tests/unit/server.test.ts`: `await platform.webhooks.flush()` before `platform.close()` in one test's cleanup. This works around production behaviour: the SQLite `platform.close()` (`packages/server/src/platform.ts`, outbox close while deliveries are in flight) returns before the outbox handle is closed. That behaviour is unchanged here; a fix belongs in a separate follow-up, not FP-009.
