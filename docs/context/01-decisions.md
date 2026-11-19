@@ -2462,3 +2462,28 @@ Decision:
 Consequences: `.agents/skills/wanees-phase/` (SKILL.md, state-schema.md, phase-status.mjs, run-state.mjs and both self-tests), the pointer `.claude/skills/wanees-phase/SKILL.md` and the AGENTS.md §3 row change. No product code, upstream LIP file or contract changes.
 
 Date / approved by: 2026-11-17, project owner (directive); implementation review per AGENTS §5 (G02).
+
+## PD-055 — Owner Dashboard decisions of 2026-11-18: sole G02 orchestrator, review routing for Codex-authored content, R5 D1 working basis, DESIGN §7 design proposals — Approved (2026-11-18); item 3 is a Proposed working basis only
+
+Approval scope: items 1, 2 and 4 are Approved as stated below. Item 3 is a **Proposed** working basis only: it approves no SQL and no migration, and does not close `schema-brief`. No item unblocks an implementation task or closes a gate.
+
+Context: on 2026-11-18 the owner acted on four decisions through the Owner Dashboard. According to the automation supervisor's hand-off, it verified each action against its HMAC-chained audit log and bound it to the exact decision revision, digest, scope and evidence hashes; that verification is the supervisor's and is not re-derived here. The verbatim questions, scopes, digests, evidence hashes and audit entry hashes are in `docs/context/evidence/PD-055/owner-dashboard-decisions-20261118.md`. Numbering: unlanded drafts already use PD-053 (D1 manifest and DESIGN, worktree `lip-d1v4-wt`) and PD-054 (G03 Codex orchestration, worktree `lip-codex-orchestrator-wt`), so this entry is PD-055.
+
+Decision:
+1. **Sole orchestrator; G03 parked** (`DEC-ORCH-01`, revision 1, audit seq 3). The scheduled Claude Code supervisor (Claude Opus 5.5 High, G02, PD-048) is the only implementation orchestrator. The unlanded G03/PD-054 Codex-orchestration change in `D:\Projects\lip-codex-orchestrator-wt` stays parked: not landed, not executed, and its worktree is preserved. It is neither landed nor discarded. This holds until a separate owner decision on G03/PD-054.
+2. **Reviewer for Codex-authored content** (`DEC-REVIEW-ROUTING-01`, revision 1, audit seq 4). This is a standing G02 routing rule. Content authored by any Codex model, which has no row in the AGENTS §5 author→reviewer table, is reviewed by the `plan-review` lane: Claude Sonnet 5.5, effort `xhigh`, read-only. Content co-authored by Sonnet is excluded and is routed per AGENTS §5. The 2026-11-18 R5 schema-draft review, session `2fe510ce-1ce3-45af-94b4-f7c5094c50f8`, therefore counts as the independent review of the Codex-authored R5 revisions.
+3. **R5 D1 working basis** (`DEC-R5-DESIGN-01`, revision 1, audit seq 5). The R5 D1 manifest and the PD-053 DESIGN (R5 remediated, reviewed PASS on 2026-11-18 in session `2fe510ce`) are the **Proposed** working basis for the remaining D1 design work. Three LOW review residuals must be fixed before any `schema-brief` closure:
+   - the `bff.members` INSERT `erasure_state` trigger;
+   - the DESIGN §3 tests;
+   - the R4-12 `noUpd` assertion.
+
+   This approves no SQL and no migration, and does not close `schema-brief`.
+4. **Design proposals for the DESIGN §7 open items** (`DEC-D1-DESIGN-WORK-01`, revision 1, audit seq 8). The orchestrator may draft design proposals for O-D1, O-B1, O-P1..O-P5, O-E1/O-E2, O-N1..O-N3, O-W1..O-W5, O-S1, O-T1 and the schema items DR-6, OD-12 and OD-15. They are documents only: no SQL, no migrations, no code and no `schema-brief` closure. Each proposal returns to the owner as its own decision with an independent review.
+
+Consequences:
+- No landed Approved decision changes. PD-048 (G02) is unchanged.
+- Item 2 covers an author class the AGENTS §5 table does not list. This entry does not edit `AGENTS.md`; adding the row there is a separate change. Until then this entry governs that routing, because `01-decisions.md` ranks first (AGENTS §2). Work that mixes Codex- and Sonnet-authored content follows the existing AGENTS §5 combination rule: split it by change set and route each part; if the parts cannot be separated, it stays blocked for the owner.
+- No item unblocks an implementation task or closes a gate. The tasks that depend on `schema-brief` stay blocked. Item 2 records the reviewer of the Codex-authored R5 revisions only. It does not decide whether that review satisfies the independent final review that the unlanded PD-053 draft (item 14) requires before any dependent schema SQL.
+- The owner's same-day approval of FP-009 (`DEC-FP009-01`, revision 1, audit seq 1) is to be recorded in the FP-009 entry of `docs/context/07-fork-patches.md` on `deliver/fp008-postgres-readiness`, under its own commit authorization, not here. Until that record lands, the FP-009 entry on that branch still reads Proposed, and origin/main has no FP-009 entry.
+
+Date / approved by: 2026-11-18, project owner through the Owner Dashboard (audit entry hashes in the evidence file). Recorded by the G02 orchestrator (Claude Opus 5.5 High) in supervisor run `lip-auto-20261118T150521Z-3c04fc4f`.
