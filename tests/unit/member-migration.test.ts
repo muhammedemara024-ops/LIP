@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -75,7 +75,6 @@ describe("member migration planning", () => {
       input: sourcePath,
       output: planPath
     });
-    expect(statSync(planPath).mode & 0o777).toBe(0o600);
 
     const program = makeProgram();
     const engine = new LoyaltyEngine(program);
@@ -138,4 +137,32 @@ describe("member migration planning", () => {
       available_balance: -1
     }])).toThrow(/cannot be negative/);
   });
+
+  // Node writeFile({ mode: 0o600 }) / chmod(0o600) does not set NTFS ACLs on Windows; POSIX 0600
+  // enforcement is therefore unsupported on win32 and must remain verified on Linux.
+  it.skipIf(process.platform === "win32")(
+    "writes member import plans with 0600 permissions (unsupported on Windows NTFS)",
+    async () => {
+      const directory = mkdtempSync(join(tmpdir(), "lip-member-migration-mode-"));
+      try {
+        const sourcePath = join(directory, "members.csv");
+        const planPath = join(directory, "plan.json");
+        writeFileSync(
+          sourcePath,
+          [
+            "external_member_id,identity_type,identity_value,member_id,available_balance",
+            "legacy-7,external,provider:legacy-7,member-migrated-7,420"
+          ].join("\n")
+        );
+        await runMemberImportPlan({
+          programId: "demo-foodservice",
+          input: sourcePath,
+          output: planPath
+        });
+        expect(statSync(planPath).mode & 0o777).toBe(0o600);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
+  );
 });

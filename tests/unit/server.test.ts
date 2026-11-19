@@ -922,6 +922,7 @@ describe("reference HTTP server", () => {
       expect(await inspectAfterErasure.json()).toMatchObject({ erased: true });
     } finally {
       await running.close();
+      await platform.webhooks.flush();
       await platform.close();
       rmSync(directory, { recursive: true, force: true });
     }

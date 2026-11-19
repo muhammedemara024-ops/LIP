@@ -93,7 +93,6 @@ describe("LIP migration archive", () => {
     expect(archive.summary.idempotency_records).toBeGreaterThanOrEqual(3);
 
     await writeMigrationArchive(output, archive);
-    expect((await stat(output)).mode & 0o777).toBe(0o600);
     const fromFile = await readMigrationArchive(output, program);
     importSqliteMigration({ archive: fromFile, databasePath: target, program });
 
@@ -158,4 +157,21 @@ describe("LIP migration archive", () => {
       format_version: 1
     });
   });
+
+  // Node writeFile({ mode: 0o600 }) / chmod(0o600) does not set NTFS ACLs on Windows; POSIX 0600
+  // enforcement is therefore unsupported on win32 and must remain verified on Linux.
+  it.skipIf(process.platform === "win32")(
+    "writes migration archives with 0600 permissions (unsupported on Windows NTFS)",
+    async () => {
+      const directory = await temporaryDirectory();
+      const source = resolve(directory, "source.db");
+      const output = resolve(directory, "migration.json");
+      const program = makeProgram();
+      saveState(source, sourceState().engine.exportState());
+
+      const archive = exportSqliteMigration({ databasePath: source, program });
+      await writeMigrationArchive(output, archive);
+      expect((await stat(output)).mode & 0o777).toBe(0o600);
+    }
+  );
 });
